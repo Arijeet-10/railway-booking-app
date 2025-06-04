@@ -1,11 +1,17 @@
 
-import TrainSearchForm from '@/components/trains/train-search-form';
+"use client";
+
+import TrainSearchForm, { type TrainSearchFormValues } from '@/components/trains/train-search-form';
 import { TrainCard } from '@/components/trains/train-card';
 import type { Train } from '@/lib/types';
 import { Separator } from '@/components/ui/separator';
 import Image from 'next/image';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useState } from 'react';
+import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Search } from 'lucide-react';
 
 // Mock data for train search results - Indian context
 const MOCK_TRAINS: Train[] = [
@@ -23,11 +29,41 @@ const MOCK_TRAINS: Train[] = [
   { id: 'T012', trainName: 'Jammu Rajdhani', trainNumber: '12425', origin: 'New Delhi (NDLS)', destination: 'Jammu Tawi (JAT)', departureTime: '20:40', arrivalTime: '05:00', duration: '8h 20m', price: 2200, availableClasses: ['business', 'first'] },
   { id: 'T013', trainName: 'Saraighat Express', trainNumber: '12345', origin: 'Kolkata Howrah Jn (HWH)', destination: 'Guwahati (GHY)', departureTime: '15:50', arrivalTime: '09:50', duration: '18h 00m', price: 1300, availableClasses: ['economy', 'business'] },
   { id: 'T014', trainName: 'Duronto Express', trainNumber: '12273', origin: 'Kolkata Howrah Jn (HWH)', destination: 'New Delhi (NDLS)', departureTime: '08:35', arrivalTime: '06:00', duration: '21h 25m', price: 2800, availableClasses: ['first', 'business'] },
-  { id: 'T015', trainName: 'Gitanjali Express', trainNumber: '12860', origin: 'Kolkata Howrah Jn (HWH)', destination: 'Mumbai CSMT (CSMT)', departureTime: '13:50', arrivalTime: '21:20', duration: '31h 30m', price: 1900, availableClasses: ['economy', 'business'] },
+  { id: 'T015', trainName: 'Gitanjali Express', trainNumber: '12860', origin: 'Kolkata Howrah Jn (HWH)', destination: 'Chhatrapati Shivaji Maharaj Terminus (CSMT)', departureTime: '13:50', arrivalTime: '21:20', duration: '31h 30m', price: 1900, availableClasses: ['economy', 'business'] },
 ];
 
 export default function HomePage() {
-  const searchResults: Train[] = MOCK_TRAINS; 
+  const [displayedTrains, setDisplayedTrains] = useState<Train[]>(MOCK_TRAINS);
+  const [searchPerformed, setSearchPerformed] = useState(false);
+  const { toast } = useToast();
+
+  const handleTrainSearch = (values: TrainSearchFormValues) => {
+    const { origin, destination } = values;
+    // Date is available in values.date if needed for filtering later
+    
+    const results = MOCK_TRAINS.filter(train => {
+      // Case-insensitive and exact match based on autocomplete values
+      const originMatch = train.origin.toLowerCase() === origin.toLowerCase();
+      const destinationMatch = train.destination.toLowerCase() === destination.toLowerCase();
+      return originMatch && destinationMatch;
+    });
+
+    setDisplayedTrains(results);
+    setSearchPerformed(true);
+
+    if (results.length > 0) {
+      toast({
+        title: "Search Results Updated",
+        description: `Showing trains from ${origin} to ${destination}.`,
+      });
+    } else {
+      toast({
+        title: "No Trains Found",
+        description: `No trains found for the route from ${origin} to ${destination}. Please try different stations.`,
+        variant: "default", // Changed from destructive to default as it's a valid search outcome
+      });
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -36,7 +72,7 @@ export default function HomePage() {
         <p className="text-lg text-card-foreground mb-6">
           Search for trains, check availability, and book your tickets hassle-free with Indian Rail Connect.
         </p>
-        <TrainSearchForm />
+        <TrainSearchForm onSearch={handleTrainSearch} />
       </section>
       
       <Separator />
@@ -65,23 +101,50 @@ export default function HomePage() {
                 <p className="text-muted-foreground">{dest.description}</p>
               </CardContent>
               <CardFooter>
-                <Button variant="outline" className="w-full">Explore Trains to {dest.city}</Button>
+                {/* This button could also trigger a search for this city as destination */}
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => handleTrainSearch({origin: "Any Station", destination: dest.city, date: new Date()})}
+                >
+                  Explore Trains to {dest.city}
+                </Button>
               </CardFooter>
             </Card>
           ))}
         </div>
       </section>
 
-      {searchResults.length > 0 && (
-        <section>
-          <h2 className="text-2xl font-semibold mb-4 text-center md:text-left">Available Trains</h2>
+      <section>
+        <h2 className="text-2xl font-semibold mb-4 text-center md:text-left">
+          {searchPerformed ? "Search Results" : "Available Trains"}
+        </h2>
+        {searchPerformed && displayedTrains.length === 0 && (
+          <Alert>
+            <Search className="h-4 w-4" />
+            <AlertTitle>No Trains Found</AlertTitle>
+            <AlertDescription>
+              We couldn&apos;t find any trains matching your search criteria for the specified route. Please try different stations or dates.
+            </AlertDescription>
+          </Alert>
+        )}
+        {displayedTrains.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {searchResults.map((train) => (
+            {displayedTrains.map((train) => (
               <TrainCard key={train.id} train={train} />
             ))}
           </div>
-        </section>
-      )}
+        )}
+         {!searchPerformed && displayedTrains.length === 0 && ( // Should not happen if initial is MOCK_TRAINS
+             <Alert>
+                <Search className="h-4 w-4" />
+                <AlertTitle>No Trains Listed</AlertTitle>
+                <AlertDescription>
+                  There are currently no trains listed. Please try a search.
+                </AlertDescription>
+            </Alert>
+         )}
+      </section>
     </div>
   );
 }

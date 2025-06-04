@@ -20,7 +20,7 @@ import { CalendarIcon, MapPin, Search, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import React, { useState, useMemo, useRef } from "react";
-import { useToast } from "@/hooks/use-toast";
+// Removed useToast from here as it will be handled by the parent page
 import { indianStations } from '@/lib/indian-stations';
 
 const formSchema = z.object({
@@ -30,11 +30,16 @@ const formSchema = z.object({
   passengers: z.number().min(1, {message: "At least one passenger required."}).optional(),
 });
 
-export default function TrainSearchForm() {
-  const { toast } = useToast();
+export type TrainSearchFormValues = z.infer<typeof formSchema>;
+
+interface TrainSearchFormProps {
+  onSearch: (values: TrainSearchFormValues) => void;
+}
+
+export default function TrainSearchForm({ onSearch }: TrainSearchFormProps) {
   const [isLoading, setIsLoading] = useState(false);
 
-  const form = useForm<z.infer<typeof formSchema>>({
+  const form = useForm<TrainSearchFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       origin: "",
@@ -44,27 +49,21 @@ export default function TrainSearchForm() {
     },
   });
 
-  function onSubmit(values: z.infer<typeof formSchema>) {
+  async function onSubmit(values: TrainSearchFormValues) {
     setIsLoading(true);
-    // Hide suggestion popovers on submit
     setShowOriginSuggestions(false);
     setShowDestinationSuggestions(false);
-    // In a real app, you would navigate to a search results page or fetch data
-    // For now, we'll just log and show a toast
-    console.log("Search values:", {
-      ...values,
-      date: format(values.date, "PPP"),
-    });
-    setTimeout(() => {
-      toast({
-        title: "Search Submitted (Mock)",
-        description: `Searching trains from ${values.origin} to ${values.destination} on ${format(values.date, "PPP")}.`,
-      });
-      setIsLoading(false);
-    }, 1500);
+    
+    onSearch(values); // Call the onSearch prop with form values
+
+    // Simulate API call delay if needed, or directly handle loading state in parent
+    // For now, we'll assume parent handles its own loading state based on onSearch
+    // setTimeout(() => {
+    //   setIsLoading(false);
+    // }, 1500);
+    setIsLoading(false); // Set loading to false after calling onSearch
   }
 
-  // State for Origin Autocomplete
   const [originInputValue, setOriginInputValue] = useState(form.getValues("origin") || "");
   const [showOriginSuggestions, setShowOriginSuggestions] = useState(false);
   const originInputWrapperRef = useRef<HTMLDivElement>(null);
@@ -88,10 +87,9 @@ export default function TrainSearchForm() {
     if (!originInputValue.trim()) return [];
     return indianStations.filter((station) =>
       station.toLowerCase().includes(originInputValue.toLowerCase().trim())
-    ).slice(0, 10); // Limit to 10 suggestions
+    ).slice(0, 10);
   }, [originInputValue]);
 
-  // State for Destination Autocomplete
   const [destinationInputValue, setDestinationInputValue] = useState(form.getValues("destination") || "");
   const [showDestinationSuggestions, setShowDestinationSuggestions] = useState(false);
   const destinationInputWrapperRef = useRef<HTMLDivElement>(null);
@@ -115,9 +113,8 @@ export default function TrainSearchForm() {
     if (!destinationInputValue.trim()) return [];
     return indianStations.filter((station) =>
       station.toLowerCase().includes(destinationInputValue.toLowerCase().trim())
-    ).slice(0, 10); // Limit to 10 suggestions
+    ).slice(0, 10);
   }, [destinationInputValue]);
-
 
   return (
     <Form {...form}>
@@ -125,7 +122,7 @@ export default function TrainSearchForm() {
         <FormField
           control={form.control}
           name="origin"
-          render={({ field }) => ( // field is not directly used for Input value/onChange to allow local state for autocomplete
+          render={({ field }) => (
             <FormItem>
               <FormLabel className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-muted-foreground" />Origin</FormLabel>
               <Popover open={showOriginSuggestions && filteredOriginStations.length > 0} onOpenChange={setShowOriginSuggestions}>
@@ -139,7 +136,7 @@ export default function TrainSearchForm() {
                         onFocus={() => {
                           if (originInputValue.trim() && filteredOriginStations.length > 0) setShowOriginSuggestions(true);
                         }}
-                        onBlur={() => setTimeout(() => setShowOriginSuggestions(false), 150)} // Delay to allow click on suggestion
+                        onBlur={() => setTimeout(() => setShowOriginSuggestions(false), 150)}
                         className="bg-background"
                         autoComplete="off"
                         aria-autocomplete="list"
@@ -153,13 +150,13 @@ export default function TrainSearchForm() {
                   className="p-0 w-full max-h-60 overflow-y-auto"
                   style={{ width: originInputWrapperRef.current?.offsetWidth }}
                   align="start"
-                  onOpenAutoFocus={(e) => e.preventDefault()} // Prevent focus stealing
+                  onOpenAutoFocus={(e) => e.preventDefault()}
                 >
                   {filteredOriginStations.map((station) => (
                     <div
                       key={station}
                       className="p-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer rounded-md"
-                      onMouseDown={(e) => { // Use onMouseDown to prevent blur before click
+                      onMouseDown={(e) => {
                         e.preventDefault();
                         handleOriginSelectSuggestion(station);
                       }}
@@ -252,7 +249,7 @@ export default function TrainSearchForm() {
                     onSelect={(date) => {
                         if (date) field.onChange(date);
                     }}
-                    disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))} // Disable past dates
+                    disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
                     initialFocus
                   />
                 </PopoverContent>
@@ -261,7 +258,7 @@ export default function TrainSearchForm() {
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full h-10" disabled={isLoading}> {/* Adjusted self-end to items-end on parent grid and set height */}
+        <Button type="submit" className="w-full h-10" disabled={isLoading}>
           {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
           Search Trains
         </Button>
