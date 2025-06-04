@@ -15,7 +15,7 @@ import { Loader2, AlertTriangle, Ticket, CalendarDays, Users, MapPin, Trash2, Do
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, addDays } from 'date-fns';
 
 export default function ManageBookingPage() {
   const params = useParams();
@@ -90,368 +90,280 @@ export default function ManageBookingPage() {
     }
 
     const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
+    const pageWidth = doc.internal.pageSize.getWidth(); // approx 595pt for A4
+    const pageHeight = doc.internal.pageSize.getHeight(); // approx 841pt for A4
     const margin = 40;
     const contentWidth = pageWidth - 2 * margin;
-    let yPos = margin;
+    let currentY = margin;
 
-    // Define colors
     const colors = {
       primary: [0, 123, 255],      // Blue
       secondary: [40, 167, 69],    // Green
       accent: [255, 193, 7],       // Yellow/Orange
       dark: [52, 58, 64],          // Dark gray
-      light: [248, 249, 250],      // Light gray
+      light: [248, 249, 250],      // Light gray for card backgrounds if needed
       danger: [220, 53, 69],       // Red
       white: [255, 255, 255],
-      text: [33, 37, 41]           // Dark text
+      text: [33, 37, 41],           // Dark text
+      mutedText: [108, 117, 125]    // Muted text
     };
 
-    // Helper function to set RGB color
-    const setColor = (colorArray, type = 'text') => {
-      if (type === 'text') {
-        doc.setTextColor(...colorArray);
-      } else if (type === 'fill') {
-        doc.setFillColor(...colorArray);
-      } else if (type === 'draw') {
-        doc.setDrawColor(...colorArray);
-      }
+    const setColor = (colorArray: number[], type: 'text' | 'fill' | 'draw' = 'text') => {
+      if (type === 'text') doc.setTextColor(colorArray[0], colorArray[1], colorArray[2]);
+      else if (type === 'fill') doc.setFillColor(colorArray[0], colorArray[1], colorArray[2]);
+      else if (type === 'draw') doc.setDrawColor(colorArray[0], colorArray[1], colorArray[2]);
     };
 
-    // Header with gradient-like effect
+    // Header Block
     setColor(colors.primary, 'fill');
-    doc.rect(0, 0, pageWidth, 80, 'F');
-
-    // Add decorative elements
-    setColor(colors.accent, 'fill');
-    doc.rect(0, 70, pageWidth, 10, 'F');
-
-    // Logo area (placeholder)
-    setColor(colors.white, 'fill');
-    doc.roundedRect(margin, 15, 120, 50, 5, 5, 'F');
-    setColor(colors.primary, 'text');
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text("IndianRail", margin + 60, 35, { align: 'center' });
-    doc.setFontSize(10);
-    doc.text("Connect", margin + 60, 50, { align: 'center' });
-
-    // Main title
+    doc.rect(0, 0, pageWidth, 70, 'F'); // Slightly shorter header
     setColor(colors.white, 'text');
-    doc.setFontSize(20);
+    doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
-    doc.text("ELECTRONIC RESERVATION SLIP", pageWidth / 2, 35, { align: 'center' });
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text("(ERS)", pageWidth / 2, 50, { align: 'center' });
-
-    // Status indicators
-    setColor(colors.white, 'fill');
-    doc.roundedRect(pageWidth - 150, 15, 110, 20, 3, 3, 'F');
+    doc.text("ELECTRONIC RESERVATION SLIP (ERS)", pageWidth / 2, currentY - 10, { align: 'center' });
+    
+    setColor(colors.white, 'fill'); // Placeholder for "WL"
+    doc.roundedRect(pageWidth - margin - 50, currentY - 25, 40, 18, 3, 3, 'F');
     setColor(colors.primary, 'text');
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
-    doc.text("CONFIRMED", pageWidth - 95, 28, { align: 'center' });
+    doc.text("CNF", pageWidth - margin - 30, currentY - 12 , { align: 'center' });
 
-    yPos = 100;
 
-    // Journey Information Card
+    currentY += 40; // Start content below the blue header bar
+
+    // Journey Information Block
+    const journeyCardY = currentY;
+    const journeyCardHeight = 110;
     setColor(colors.light, 'fill');
-    doc.roundedRect(margin, yPos, contentWidth, 120, 8, 8, 'F');
+    doc.roundedRect(margin, journeyCardY, contentWidth, journeyCardHeight, 5, 5, 'F');
+    setColor(colors.dark, 'draw');
+    doc.setLineWidth(0.5);
+    doc.roundedRect(margin, journeyCardY, contentWidth, journeyCardHeight, 5, 5, 'S');
 
-    // Journey header
-    setColor(colors.primary, 'fill');
-    doc.roundedRect(margin, yPos, contentWidth, 35, 8, 8, 'F');
-    doc.rect(margin, yPos + 27, contentWidth, 8, 'F'); // Overlap for seamless look
-
-    setColor(colors.white, 'text');
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text("JOURNEY DETAILS", margin + 15, yPos + 22);
-
-    yPos += 50;
-
-    // Journey details with icons (using symbols)
-    const journeyY = yPos;
-
-    // From section
+    let textY = journeyCardY + 15;
     setColor(colors.text, 'text');
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.text("FROM", margin + 15, journeyY);
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text(booking.origin.toUpperCase(), margin + 15, journeyY + 18);
     doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    setColor(colors.dark, 'text');
-    doc.text(`Departure: ${booking.departureTime}`, margin + 15, journeyY + 35);
-    doc.text(format(parseISO(booking.travelDate + "T00:00:00"), "dd MMM yyyy"), margin + 15, journeyY + 50);
-
-    // Arrow or connection line
-    setColor(colors.primary, 'draw');
-    doc.setLineWidth(2);
-    doc.line(margin + contentWidth / 2 - 30, journeyY + 10, margin + contentWidth / 2 + 30, journeyY + 10);
-    // Arrow head
-    doc.line(margin + contentWidth / 2 + 25, journeyY + 5, margin + contentWidth / 2 + 30, journeyY + 10);
-    doc.line(margin + contentWidth / 2 + 25, journeyY + 15, margin + contentWidth / 2 + 30, journeyY + 10);
-
-    // To section
-    setColor(colors.text, 'text');
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.text("TO", pageWidth - margin - 15, journeyY, { align: 'right' });
-    doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text(booking.destination.toUpperCase(), pageWidth - margin - 15, journeyY + 18, { align: 'right' });
-    doc.setFontSize(9);
+    doc.text("Booked From:", margin + 10, textY);
     doc.setFont('helvetica', 'normal');
-    setColor(colors.dark, 'text');
+    doc.text(booking.origin.toUpperCase(), margin + 90, textY);
 
+    textY += 20;
+    doc.setFont('helvetica', 'bold');
+    doc.text("Boarding At:", margin + 10, textY);
+    doc.setFont('helvetica', 'normal');
+    doc.text(booking.origin.toUpperCase(), margin + 90, textY); // Assuming boarding is same as origin
+
+    textY += 20;
+    doc.setFont('helvetica', 'bold');
+    doc.text("To:", margin + 10, textY);
+    doc.setFont('helvetica', 'normal');
+    doc.text(booking.destination.toUpperCase(), margin + 90, textY);
+
+    // Departure/Arrival Times on the right side of Journey Block
+    const journeyRightX = margin + contentWidth / 2 + 20;
+    textY = journeyCardY + 15;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text("Departure:", journeyRightX, textY);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${format(parseISO(booking.travelDate + "T00:00:00"), "dd MMM yyyy")}, ${booking.departureTime}`, journeyRightX + 60, textY);
+
+    textY += 20;
+    doc.setFont('helvetica', 'bold');
+    doc.text("Arrival:", journeyRightX, textY);
+    doc.setFont('helvetica', 'normal');
+    
     // Calculate arrival date
-    const arrivalDate = new Date(parseISO(booking.travelDate + "T00:00:00"));
+    const departureDate = parseISO(booking.travelDate + "T00:00:00");
+    let arrivalDateCalc = departureDate;
     if (parseInt(booking.arrivalTime.split(':')[0]) < parseInt(booking.departureTime.split(':')[0])) {
-      arrivalDate.setDate(arrivalDate.getDate() + 1);
+      arrivalDateCalc = addDays(departureDate, 1);
     }
+    doc.text(`${format(arrivalDateCalc, "dd MMM yyyy")}, ${booking.arrivalTime}`, journeyRightX + 60, textY);
 
-    doc.text(`Arrival: ${booking.arrivalTime}`, pageWidth - margin - 15, journeyY + 35, { align: 'right' });
-    doc.text(format(arrivalDate, "dd MMM yyyy"), pageWidth - margin - 15, journeyY + 50, { align: 'right' });
+    currentY = journeyCardY + journeyCardHeight + 15;
 
-    yPos += 140;
-
-    // Train and Booking Information Cards
-    const cardHeight = 100;
-    const cardSpacing = 15;
-    const cardWidth = (contentWidth - cardSpacing) / 2;
-
-    // Train Information Card
-    setColor(colors.white, 'fill');
-    doc.roundedRect(margin, yPos, cardWidth, cardHeight, 8, 8, 'F');
-    setColor(colors.light, 'draw');
-    doc.setLineWidth(1);
-    doc.roundedRect(margin, yPos, cardWidth, cardHeight, 8, 8, 'S');
-
-    setColor(colors.secondary, 'fill');
-    doc.roundedRect(margin, yPos, cardWidth, 25, 8, 8, 'F');
-    doc.rect(margin, yPos + 17, cardWidth, 8, 'F');
-
-    setColor(colors.white, 'text');
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text("TRAIN INFORMATION", margin + 10, yPos + 17);
-
-    setColor(colors.text, 'text');
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text("Train Number:", margin + 10, yPos + 40);
-    doc.setFont('helvetica', 'bold');
-    doc.text(booking.trainNumber, margin + 10, yPos + 55);
-
-    doc.setFont('helvetica', 'normal');
-    doc.text("Train Name:", margin + 10, yPos + 70);
-    doc.setFont('helvetica', 'bold');
-    doc.text(booking.trainName, margin + 10, yPos + 85);
-
-    // Booking Information Card
-    const bookingCardX = margin + cardWidth + cardSpacing;
-    setColor(colors.white, 'fill');
-    doc.roundedRect(bookingCardX, yPos, cardWidth, cardHeight, 8, 8, 'F');
-    setColor(colors.light, 'draw');
-    doc.setLineWidth(1);
-    doc.roundedRect(bookingCardX, yPos, cardWidth, cardHeight, 8, 8, 'S');
-
-    setColor(colors.accent, 'fill');
-    doc.roundedRect(bookingCardX, yPos, cardWidth, 25, 8, 8, 'F');
-    doc.rect(bookingCardX, yPos + 17, cardWidth, 8, 'F');
-
-    setColor(colors.dark, 'text');
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text("BOOKING DETAILS", bookingCardX + 10, yPos + 17);
-
-    setColor(colors.text, 'text');
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`PNR: ${booking.pnr || 'N/A'}`, bookingCardX + 10, yPos + 40);
-    doc.text(`Class: ${booking.selectedClass.toUpperCase()}`, bookingCardX + 10, yPos + 55);
-    doc.text(`Quota: ${booking.quota || 'N/A'}`, bookingCardX + 10, yPos + 70);
-    doc.text(`Distance: ${booking.distance || 'N/A'} km`, bookingCardX + 10, yPos + 85);
-
-    yPos += cardHeight + 30;
-
-    // Passenger Details Section
-    setColor(colors.dark, 'fill');
-    doc.roundedRect(margin, yPos, contentWidth, 30, 8, 8, 'F');
-    doc.rect(margin, yPos + 22, contentWidth, 8, 'F');
-
-    setColor(colors.white, 'text');
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text("PASSENGER DETAILS", margin + 15, yPos + 20);
-
-    yPos += 45;
-
-    // Passenger table with better styling
+    // PNR / Train / Class Block
+    const pnrTrainClassCardY = currentY;
+    const pnrTrainClassCardHeight = 80; // Reduced height
     setColor(colors.light, 'fill');
-    doc.rect(margin, yPos, contentWidth, 25, 'F');
+    doc.roundedRect(margin, pnrTrainClassCardY, contentWidth, pnrTrainClassCardHeight, 5, 5, 'F');
+    setColor(colors.dark, 'draw');
+    doc.roundedRect(margin, pnrTrainClassCardY, contentWidth, pnrTrainClassCardHeight, 5, 5, 'S');
+    
+    textY = pnrTrainClassCardY + 15;
+    const col1X = margin + 10;
+    const col2X = margin + contentWidth / 2;
 
-    const colWidths = [40, (contentWidth - 40) * 0.35, (contentWidth - 40) * 0.15, (contentWidth - 40) * 0.15, (contentWidth - 40) * 0.20, (contentWidth - 40) * 0.15];
-    let currentX = margin;
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');doc.text("PNR:", col1X, textY);
+    doc.setFont('helvetica', 'normal'); doc.text(booking.pnr || 'N/A', col1X + 70, textY);
 
-    setColor(colors.dark, 'text');
-    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');doc.text("Train No./Name:", col2X, textY);
+    doc.setFont('helvetica', 'normal'); doc.text(`${booking.trainNumber} / ${booking.trainName}`, col2X + 80, textY);
+
+    textY += 20;
+    doc.setFont('helvetica', 'bold');doc.text("Quota:", col1X, textY);
+    doc.setFont('helvetica', 'normal'); doc.text(booking.quota || 'GENERAL', col1X + 70, textY);
+
+    doc.setFont('helvetica', 'bold');doc.text("Class:", col2X, textY);
+    doc.setFont('helvetica', 'normal'); doc.text(booking.selectedClass.toUpperCase(), col2X + 80, textY);
+    
+    textY += 20;
+    doc.setFont('helvetica', 'bold');doc.text("Distance:", col1X, textY);
+    doc.setFont('helvetica', 'normal'); doc.text(booking.distance || 'N/A', col1X + 70, textY);
+    
+    doc.setFont('helvetica', 'bold');doc.text("Booking Date:", col2X, textY);
+    doc.setFont('helvetica', 'normal'); doc.text(format(parseISO(booking.bookingDate), "dd-MMM-yyyy HH:mm"), col2X + 80, textY);
+
+    currentY = pnrTrainClassCardY + pnrTrainClassCardHeight + 15;
+
+    // Passenger Details Table
+    const passengerHeaderY = currentY;
+    setColor(colors.dark, 'fill');
+    doc.roundedRect(margin, passengerHeaderY, contentWidth, 25, 5, 5, 'F');
+    doc.rect(margin, passengerHeaderY + 15, contentWidth, 10, 'F'); // bottom part of rounded header
+    setColor(colors.white, 'text');
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    const headers = ["S.No", "Passenger Name", "Age", "Gender", "Booking Status", "Current Status"];
+    doc.text("PASSENGER DETAILS", margin + 10, passengerHeaderY + 16);
+    currentY = passengerHeaderY + 25;
+
+    const passengerTableStartY = currentY;
+    const colWidths = [30, (contentWidth - 30) * 0.33, (contentWidth - 30) * 0.12, (contentWidth - 30) * 0.15, (contentWidth - 30) * 0.20, (contentWidth - 30) * 0.20];
+    let tableHeaderX = margin;
+
+    setColor(colors.mutedText, 'fill');
+    doc.rect(margin, currentY, contentWidth, 20, 'F'); // Table header background
+    setColor(colors.dark, 'text');
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    const headers = ["SNo", "Name", "Age", "Gender", "Booking Status", "Current Status"];
     headers.forEach((header, i) => {
-      doc.text(header, currentX + 5, yPos + 15);
-      currentX += colWidths[i];
+      doc.text(header, tableHeaderX + 3, currentY + 13);
+      tableHeaderX += colWidths[i];
     });
+    currentY += 20;
 
-    yPos += 25;
-
-    // Passenger rows with alternating colors
     booking.passengersList.forEach((passenger, index) => {
-      if (index % 2 === 0) {
-        setColor(colors.white, 'fill');
-        doc.rect(margin, yPos, contentWidth, 20, 'F');
+      if (index % 2 !== 0) { // Alternate row color
+         setColor(colors.light, 'fill');
+         doc.rect(margin, currentY, contentWidth, 18, 'F');
       }
-
-      currentX = margin;
+      let cellX = margin;
       setColor(colors.text, 'text');
-      doc.setFontSize(9);
+      doc.setFontSize(8);
       doc.setFont('helvetica', 'normal');
 
-      doc.text(`${index + 1}`, currentX + 5, yPos + 12);
-      currentX += colWidths[0];
-      doc.text(passenger.name.toUpperCase(), currentX + 5, yPos + 12);
-      currentX += colWidths[1];
-      doc.text(String(passenger.age), currentX + 5, yPos + 12);
-      currentX += colWidths[2];
-      doc.text(passenger.gender.charAt(0).toUpperCase(), currentX + 5, yPos + 12);
-      currentX += colWidths[3];
-
-      // Status with color coding
-      const bookingStatus = passenger.bookingStatus || 'N/A';
-      if (bookingStatus.includes('CNF') || bookingStatus.includes('CONFIRMED')) {
-        setColor(colors.secondary, 'text');
-      } else if (bookingStatus.includes('WL') || bookingStatus.includes('WAITLIST')) {
-        setColor(colors.accent, 'text');
-      } else {
-        setColor(colors.text, 'text');
-      }
-      doc.text(bookingStatus, currentX + 5, yPos + 12);
-      currentX += colWidths[4];
-
-      setColor(colors.text, 'text');
-      doc.text(passenger.currentStatus || 'N/A', currentX + 5, yPos + 12);
-      yPos += 20;
+      doc.text(`${index + 1}`, cellX + 3, currentY + 12); cellX += colWidths[0];
+      doc.text(passenger.name.toUpperCase(), cellX + 3, currentY + 12); cellX += colWidths[1];
+      doc.text(String(passenger.age), cellX + 3, currentY + 12); cellX += colWidths[2];
+      doc.text(passenger.gender.charAt(0).toUpperCase(), cellX + 3, currentY + 12); cellX += colWidths[3];
+      
+      const bookingStatus = passenger.bookingStatus || (passenger.age && passenger.age > 18 ? 'CNF/S10/34' : 'WL/15');
+      doc.text(bookingStatus, cellX + 3, currentY + 12); cellX += colWidths[4];
+      
+      const currentStatus = passenger.currentStatus || (passenger.age && passenger.age > 18 ? 'CNF/S10/34' : 'WL/5');
+      doc.text(currentStatus, cellX + 3, currentY + 12);
+      
+      currentY += 18;
     });
+    setColor(colors.dark, 'draw'); // Border for table
+    doc.rect(margin, passengerTableStartY, contentWidth, currentY - passengerTableStartY, 'S');
 
-    yPos += 20;
 
-    // Payment Details Card
-    setColor(colors.white, 'fill');
-    doc.roundedRect(margin, yPos, contentWidth, 150, 8, 8, 'F');
-    setColor(colors.light, 'draw');
-    doc.setLineWidth(1);
-    doc.roundedRect(margin, yPos, contentWidth, 150, 8, 8, 'S');
+    currentY += 15; // Space after passenger table
 
-    setColor(colors.primary, 'fill');
-    doc.roundedRect(margin, yPos, contentWidth, 30, 8, 8, 'F');
-    doc.rect(margin, yPos + 22, contentWidth, 8, 'F');
+    // Payment Details Section
+    const paymentCardY = currentY;
+    const paymentCardHeight = 100; // Reduced
+    setColor(colors.light, 'fill');
+    doc.roundedRect(margin, paymentCardY, contentWidth, paymentCardHeight, 5, 5, 'F');
+    setColor(colors.dark, 'draw');
+    doc.roundedRect(margin, paymentCardY, contentWidth, paymentCardHeight, 5, 5, 'S');
 
+    setColor(colors.secondary, 'fill');
+    doc.roundedRect(margin, paymentCardY, contentWidth, 25, 5, 5, 'F');
+    doc.rect(margin, paymentCardY + 15, contentWidth, 10, 'F');
     setColor(colors.white, 'text');
-    doc.setFontSize(12);
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text("PAYMENT DETAILS", margin + 15, yPos + 20);
-
-    yPos += 45;
-
-    // Payment items
-    const paymentItems = [
-      { label: "Ticket Fare", value: booking.ticketFare },
-      { label: "IRCTC Convenience Fee (Incl. GST)", value: booking.convenienceFee },
-      { label: "Total Amount", value: booking.totalPrice, isTotal: true }
-    ];
-
-    paymentItems.forEach((item, index) => {
-      if (item.isTotal) {
-        setColor(colors.primary, 'fill');
-        doc.rect(margin + 10, yPos - 5, contentWidth - 20, 25, 'F');
-        setColor(colors.white, 'text');
-        doc.setFont('helvetica', 'bold');
-      } else {
-        setColor(colors.text, 'text');
-        doc.setFont('helvetica', 'normal');
-      }
-
-      doc.setFontSize(10);
-      doc.text(item.label, margin + 15, yPos + 10);
-
-      const valueText = item.value ? `₹ ${item.value.toFixed(2)}` : 'N/A';
-      doc.text(valueText, pageWidth - margin - 15, yPos + 10, { align: 'right' });
-
-      yPos += item.isTotal ? 35 : 25;
-    });
-
-    yPos += 20;
-
-    // Transaction ID
-    setColor(colors.dark, 'text');
+    doc.text("PAYMENT DETAILS", margin + 10, paymentCardY + 16);
+    
+    textY = paymentCardY + 25 + 15;
     doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Transaction ID: ${booking.transactionId || 'N/A'}`, margin, yPos);
-    doc.text(`Booking Date: ${format(parseISO(booking.bookingDate), "dd-MMM-yyyy HH:mm")}`, pageWidth - margin, yPos, { align: 'right' });
-
-    yPos += 30;
-
-    // Important Notes Section
-    setColor(colors.danger, 'fill');
-    doc.roundedRect(margin, yPos, contentWidth, 25, 8, 8, 'F');
-    doc.rect(margin, yPos + 17, contentWidth, 8, 'F');
-
-    setColor(colors.white, 'text');
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text("IMPORTANT NOTES", margin + 15, yPos + 17);
-
-    yPos += 35;
-
-    const notes = [
-      "• Carry original photo ID proof during journey. SMS/VRM/ERS along with ID is mandatory.",
-      "• Departure/Arrival times are subject to change. Verify from Railway Station or Dial 139.",
-      "• This ticket is booked on personal User ID. Sale/Purchase is punishable under Railways Act.",
-      "• IRCTC Convenience Fee is charged per e-ticket regardless of passenger count."
+    const paymentItems = [
+      { label: "Ticket Fare:", value: booking.ticketFare },
+      { label: "IRCTC Convenience Fee (Incl. GST):", value: booking.convenienceFee },
+      { label: "Total Amount:", value: booking.totalPrice, isTotal: true }
     ];
 
+    paymentItems.forEach(item => {
+      setColor(colors.text, 'text');
+      doc.setFont('helvetica', item.isTotal ? 'bold' : 'normal');
+      doc.text(item.label, margin + 10, textY);
+      const valueText = item.value !== undefined ? `₹ ${item.value.toFixed(2)}` : 'N/A';
+      doc.text(valueText, pageWidth - margin - 10, textY, { align: 'right' });
+      textY += item.isTotal ? 20 : 18;
+    });
+    currentY = paymentCardY + paymentCardHeight + 10;
+
+    // Transaction ID and GST details (simplified)
     setColor(colors.text, 'text');
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
+    doc.text(`Transaction ID: ${booking.transactionId || 'N/A'}`, margin, currentY);
+    currentY += 12;
+    doc.text(`Supplier GSTIN: ${booking.gstDetails?.supplierGstin || 'N/A'}`, margin, currentY);
+    doc.text(`SAC Code: ${booking.gstDetails?.supplierSacCode || 'N/A'}`, margin + contentWidth / 2, currentY);
+    currentY += 12;
+
+    // Important Notes Section
+    const notesHeaderY = currentY;
+    setColor(colors.danger, 'fill');
+    doc.roundedRect(margin, notesHeaderY, contentWidth, 20, 5, 5, 'F'); // Shorter header
+    doc.rect(margin, notesHeaderY + 10, contentWidth, 10, 'F');
+    setColor(colors.white, 'text');
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text("IMPORTANT NOTES", margin + 10, notesHeaderY + 14);
+    currentY = notesHeaderY + 20 + 5;
+
+    const notes = [
+      "Carry original photo ID proof during journey. ERS/VRM/SMS with ID is mandatory.",
+      "Verify departure/arrival times from Railway Station or Dial 139.",
+      "This ticket is booked on personal User ID. Sale/Purchase is punishable under Railways Act.",
+    ];
+    setColor(colors.text, 'text');
+    doc.setFontSize(7); // Smaller font for notes
+    doc.setFont('helvetica', 'normal');
     notes.forEach(note => {
-      const splitText = doc.splitTextToSize(note, contentWidth - 20);
-      doc.text(splitText, margin + 10, yPos);
-      yPos += (splitText.length * 10) + 5;
+      if (currentY < pageHeight - margin - 30) { // Check if space left before footer
+        const splitText = doc.splitTextToSize(note, contentWidth - 10); // -10 for internal padding
+        doc.text(splitText, margin + 5, currentY);
+        currentY += (splitText.length * 9) + 2; // 9pt line height for 7pt font
+      }
     });
-
+    
     // Footer
-    yPos = pageHeight - 60;
+    currentY = pageHeight - 50; // Position footer
     setColor(colors.light, 'fill');
-    doc.rect(0, yPos, pageWidth, 60, 'F');
-
-    setColor(colors.dark, 'text');
+    doc.rect(0, currentY, pageWidth, 50, 'F');
+    setColor(colors.mutedText, 'text');
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    doc.text("Generated by IndianRailConnect", pageWidth / 2, yPos + 20, { align: 'center' });
-    doc.text(`Generated on: ${new Date().toLocaleString()}`, pageWidth / 2, yPos + 35, { align: 'center' });
+    doc.text("Generated by IndianRailConnect", pageWidth / 2, currentY + 15, { align: 'center' });
+    doc.text(`Generated on: ${new Date().toLocaleString()}`, pageWidth / 2, currentY + 30, { align: 'center' });
     setColor(colors.primary, 'text');
-    doc.text("Safe Journey!", pageWidth / 2, yPos + 50, { align: 'center' });
+    doc.setFont('helvetica','bold');
+    doc.text("Safe Journey!", pageWidth / 2, currentY + 45, { align: 'center' });
 
-    // Save the PDF
     doc.save(`IndianRailConnect-Ticket-${booking.id}.pdf`);
     toast({
       title: "Success",
-      description: "Your professional ticket PDF has been generated successfully!",
+      description: "Your ticket PDF has been generated!",
     });
   };
 
@@ -490,7 +402,6 @@ export default function ManageBookingPage() {
     );
   }
 
-  // Format travel date for display
   const travelDateDisplay = booking.travelDate ? format(parseISO(booking.travelDate + "T00:00:00"), "PPP") : "N/A";
   const bookingDateDisplay = booking.bookingDate ? format(parseISO(booking.bookingDate), "PPpp") : "N/A";
 
@@ -562,13 +473,14 @@ export default function ManageBookingPage() {
                     <li key={index}>
                       {p.name} (Age: {p.age}, Gender: {p.gender.charAt(0).toUpperCase() + p.gender.slice(1)}, Berth: {p.preferredBerth.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')})
                       <br />
-                      <span className="text-xs text-muted-foreground">Booking: {p.bookingStatus || 'N/A'} | Current: {p.currentStatus || 'N/A'}</span>
+                      <span className="text-xs text-muted-foreground">Booking: {p.bookingStatus || (p.age && p.age > 18 ? 'CNF/S10/34' : 'WL/15')} | Current: {p.currentStatus || (p.age && p.age > 18 ? 'CNF/S10/34' : 'WL/5')}</span>
                     </li>
                   ))}
                 </ul>
               ) : (
                 <ul className="list-disc list-inside pl-4 space-y-1 text-sm">
-                  {booking.seats.map((seatName, index) => (
+                  {/* Fallback if passengersList is somehow empty but seats exist (legacy) */}
+                  {(booking.seats || []).map((seatName, index) => (
                     <li key={index}>{seatName}</li>
                   ))}
                 </ul>
@@ -605,3 +517,5 @@ export default function ManageBookingPage() {
     </ClientAuthGuard>
   );
 }
+
+    
