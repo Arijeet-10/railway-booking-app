@@ -1,4 +1,6 @@
 
+import type { PassengerFormValues } from '@/components/bookings/passenger-form';
+
 export interface UserProfile {
   uid: string;
   email: string | null;
@@ -35,20 +37,23 @@ export interface Seat {
 }
 
 export interface Booking {
-  id: string;
+  id: string; // Document ID from Firestore, can be optional if creating
   userId: string;
   trainId: string;
   trainName: string;
   trainNumber: string;
   origin: string;
   destination: string;
-  bookingDate: string;
+  bookingDate: string; // ISO string
   travelDate: string;  // YYYY-MM-DD
   departureTime: string;
   arrivalTime: string;
-  seats: string[];
+  seats: string[]; // e.g., Passenger names or actual seat numbers if assigned
   totalPrice: number;
   status: 'upcoming' | 'completed' | 'cancelled';
+  selectedClass: string;
+  numPassengers: number;
+  passengersList?: PassengerFormValues[]; // Detailed passenger info
 }
 
 export interface SmartSuggestionInputParams {

@@ -7,62 +7,107 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Ticket, Users, CalendarDays, Train, CreditCard, ShieldCheck, Home, ArrowLeft } from 'lucide-react';
+import { Ticket, Users, CalendarDays, Train, CreditCard, ShieldCheck, Home, ArrowLeft, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import type { PassengerFormValues } from '@/components/bookings/passenger-form'; // Assuming this type is exported
+import type { PassengerFormValues } from '@/components/bookings/passenger-form';
 import { MOCK_TRAINS } from '@/lib/mock-data';
 import type { TrainDetailed } from '@/lib/types';
+import { auth, firestore } from '@/lib/firebase/config'; // Added firestore
+import { collection, addDoc } from "firebase/firestore"; // Firestore functions
+import { useToast } from '@/hooks/use-toast';
+
 
 export default function PaymentPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { toast } = useToast();
 
   const trainId = searchParams.get('trainId');
-  const date = searchParams.get('date');
+  const date = searchParams.get('date'); // This is YYYY-MM-DD string
   const selectedClass = searchParams.get('class');
   const origin = searchParams.get('origin');
   const destination = searchParams.get('destination');
-  const numPassengers = searchParams.get('numPassengers');
+  const numPassengersQuery = searchParams.get('numPassengers'); // String from query
 
   const [passengers, setPassengers] = useState<PassengerFormValues[]>([]);
   const [trainDetails, setTrainDetails] = useState<TrainDetailed | null>(null);
   const [totalPrice, setTotalPrice] = useState(0);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   useEffect(() => {
-    // Retrieve passenger details from localStorage
     const storedPassengers = localStorage.getItem('pendingBookingPassengers');
     if (storedPassengers) {
-      setPassengers(JSON.parse(storedPassengers) as PassengerFormValues[]);
+      const parsedPassengers = JSON.parse(storedPassengers) as PassengerFormValues[];
+      setPassengers(parsedPassengers);
     }
 
-    // Find train details
     if (trainId) {
       const foundTrain = MOCK_TRAINS.find(t => t.id === trainId);
       if (foundTrain) {
         setTrainDetails(foundTrain);
-        // Calculate total price (example: train price * num passengers)
-        // Add class-specific pricing logic if needed
-        const pricePerPassenger = foundTrain.price; 
-        setTotalPrice(pricePerPassenger * (parseInt(numPassengers || '1', 10)));
+        const pricePerPassenger = foundTrain.price;
+        const numActualPassengers = parseInt(numPassengersQuery || '0', 10);
+        setTotalPrice(pricePerPassenger * numActualPassengers);
       }
     }
-  }, [trainId, numPassengers]);
+  }, [trainId, numPassengersQuery]);
 
 
-  const handleConfirmPayment = () => {
-    // Simulate payment processing
-    console.log("Payment confirmed for:", { trainId, date, selectedClass, origin, destination, passengers, totalPrice });
-    
-    // Clear localStorage
-    localStorage.removeItem('pendingBookingPassengers');
+  const handleConfirmPayment = async () => {
+    setIsProcessingPayment(true);
+    const currentUser = auth.currentUser;
 
-    // Redirect to a success page or bookings history (for now, just an alert and redirect to bookings)
-    alert("Payment Successful! Your booking is confirmed."); // Replace with a proper toast/modal
-    router.push('/bookings'); 
+    if (!currentUser || !trainDetails || !trainId || !date || !selectedClass || !origin || !destination || passengers.length === 0) {
+      toast({
+        title: "Error",
+        description: "Missing booking information or user not logged in. Cannot proceed.",
+        variant: "destructive",
+      });
+      setIsProcessingPayment(false);
+      return;
+    }
+
+    const bookingData = {
+      userId: currentUser.uid,
+      trainId: trainId,
+      trainName: trainDetails.trainName,
+      trainNumber: trainDetails.trainNumber,
+      origin: origin,
+      destination: destination,
+      travelDate: date, // Already YYYY-MM-DD
+      departureTime: trainDetails.departureTime,
+      arrivalTime: trainDetails.arrivalTime,
+      passengersList: passengers, // Store full passenger details
+      seats: passengers.map(p => p.name), // For quick display on booking card
+      numPassengers: passengers.length,
+      totalPrice: totalPrice,
+      status: 'upcoming' as 'upcoming' | 'completed' | 'cancelled',
+      bookingDate: new Date().toISOString(),
+      selectedClass: selectedClass,
+    };
+
+    try {
+      await addDoc(collection(firestore, "bookings"), bookingData);
+      toast({
+        title: "Payment Successful!",
+        description: "Your booking is confirmed and details saved.",
+      });
+      localStorage.removeItem('pendingBookingPassengers');
+      router.push('/bookings');
+    } catch (error) {
+      console.error("Error saving booking: ", error);
+      toast({
+        title: "Booking Save Failed",
+        description: "Could not save your booking details. Please contact support.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessingPayment(false);
+    }
   };
 
 
-  if (!trainId || !date || !selectedClass || !numPassengers) {
+  if (!trainId || !date || !selectedClass || !numPassengersQuery) {
     return (
         <ClientAuthGuard>
             <div className="max-w-md mx-auto py-12">
@@ -80,11 +125,13 @@ export default function PaymentPage() {
         </ClientAuthGuard>
     )
   }
+  const numPassengers = parseInt(numPassengersQuery, 10);
+
 
   return (
     <ClientAuthGuard>
       <div className="max-w-2xl mx-auto py-8 space-y-6">
-         <Button variant="outline" size="sm" onClick={() => router.back()} className="mb-4">
+         <Button variant="outline" size="sm" onClick={() => router.back()} className="mb-4" disabled={isProcessingPayment}>
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to Passenger Details
         </Button>
 
@@ -116,8 +163,8 @@ export default function PaymentPage() {
                 <h3 className="text-lg font-semibold mb-2 mt-4 flex items-center">
                     <Users className="mr-2 h-5 w-5 text-muted-foreground" /> Passengers ({passengers.length})
                 </h3>
-                <ul className="list-disc list-inside pl-4 space-y-1 text-sm text-muted-foreground">
-                  {passengers.map((p, i) => <li key={i}>{p.name} (Age: {p.age})</li>)}
+                <ul className="list-disc list-inside pl-4 space-y-1 text-sm text-muted-foreground max-h-32 overflow-y-auto">
+                  {passengers.map((p, i) => <li key={i}>{p.name} (Age: {p.age}, Gender: {p.gender}, Berth: {p.preferredBerth.replace(/_/g, ' ')})</li>)}
                 </ul>
               </div>
             )}
@@ -132,22 +179,23 @@ export default function PaymentPage() {
                 <ShieldCheck className="h-5 w-5 text-green-600"/>
                 <AlertTitle className="text-green-700">Secure Payment</AlertTitle>
                 <AlertDescription>
-                    This is a simulated payment gateway. No real transaction will occur.
+                    This is a simulated payment gateway. Clicking "Confirm & Pay" will save your booking to the database. No real transaction will occur.
                 </AlertDescription>
             </Alert>
 
           </CardContent>
           <CardFooter className="flex flex-col sm:flex-row justify-between items-center gap-3">
-            <Button variant="outline" onClick={() => router.push('/')} className="w-full sm:w-auto">
+            <Button variant="outline" onClick={() => router.push('/')} className="w-full sm:w-auto" disabled={isProcessingPayment}>
                 <Home className="mr-2 h-4 w-4" /> Cancel & Go Home
             </Button>
             <Button 
                 size="lg" 
                 onClick={handleConfirmPayment} 
                 className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
+                disabled={isProcessingPayment || passengers.length === 0}
             >
-              <CreditCard className="mr-2 h-5 w-5" />
-              Confirm & Pay ₹{totalPrice.toFixed(2)}
+              {isProcessingPayment ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
+              {isProcessingPayment ? 'Processing...' : `Confirm & Pay ₹${totalPrice.toFixed(2)}`}
             </Button>
           </CardFooter>
         </Card>
