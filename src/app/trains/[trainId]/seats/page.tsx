@@ -31,22 +31,22 @@ const TrainDetailItem: React.FC<TrainDetailItemProps> = ({ label, value }) => (
 
 const berthColors: Record<Seat['type'], string> = {
   lower: 'bg-yellow-300 border-yellow-400',
-  middle: 'bg-pink-300 border-pink-400',
+  middle: 'bg-pink-300 border-pink-400', // Kept for 3A
   upper: 'bg-sky-300 border-sky-400',
   side_lower: 'bg-green-400 border-green-500',
   side_upper: 'bg-purple-400 border-purple-500',
-  toilet: 'bg-gray-200 border-gray-300 text-gray-600', 
   door: 'bg-gray-200 border-gray-300 text-gray-600',
   aisle: 'bg-transparent',
   empty: 'bg-transparent border-transparent',
   legend_title: 'bg-transparent font-bold',
   legend_item: 'bg-transparent',
+  toilet: 'bg-gray-200 border-gray-300 text-gray-600', // Should have been removed from legend, will keep color def
 };
 
 const legendData: { type: Seat['type']; label: string; colorClass: string }[] = [
     { type: 'door', label: 'Door/Entry', colorClass: berthColors.door },
     { type: 'lower', label: 'Lower Berth', colorClass: berthColors.lower },
-    { type: 'middle', label: 'Middle Berth', colorClass: berthColors.middle },
+    { type: 'middle', label: 'Middle Berth (3A)', colorClass: berthColors.middle },
     { type: 'upper', label: 'Upper Berth', colorClass: berthColors.upper },
     { type: 'side_lower', label: 'Side Lower', colorClass: berthColors.side_lower },
     { type: 'side_upper', label: 'Side Upper', colorClass: berthColors.side_upper },
@@ -128,53 +128,40 @@ export default function TrainSeatAvailabilityPage() {
 
 
   const generateAC3TierLayout = useCallback((): Seat[][] => {
-    // Defines a 18-segment (length) x 5-element (width) grid for AC 3 Tier
     const ac3Layout: Seat[][] = Array(18).fill(null).map(() => Array(5).fill(null).map(() => ({ id: `empty-${Math.random()}`, status: 'empty', type: 'empty' })));
-
-    // Define end segments (Doors/Entries)
     const entryDisplayText = "ENTRY";
-    ac3Layout[0][0] = {id: 'ENTRY_TL', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
-    ac3Layout[0][1] = {id: 'EMPTY_T1', type: 'empty', status: 'empty'};
-    ac3Layout[0][2] = {id: 'EMPTY_T2', type: 'empty', status: 'empty'};
-    ac3Layout[0][3] = {id: 'AISLE_T', type: 'aisle', status: 'aisle'}; // Aisle continues
-    ac3Layout[0][4] = {id: 'ENTRY_TR', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
+    ac3Layout[0][0] = {id: 'ENTRY_TL_3A', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
+    ac3Layout[0][1] = {id: 'EMPTY_T1_3A', type: 'empty', status: 'empty'};
+    ac3Layout[0][2] = {id: 'EMPTY_T2_3A', type: 'empty', status: 'empty'};
+    ac3Layout[0][3] = {id: 'AISLE_T_3A', type: 'aisle', status: 'aisle'};
+    ac3Layout[0][4] = {id: 'EMPTY_T3_3A', type: 'empty', status: 'empty'};
 
-    ac3Layout[17][0] = {id: 'ENTRY_BL', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
-    ac3Layout[17][1] = {id: 'EMPTY_B1', type: 'empty', status: 'empty'};
-    ac3Layout[17][2] = {id: 'EMPTY_B2', type: 'empty', status: 'empty'};
-    ac3Layout[17][3] = {id: 'AISLE_B', type: 'aisle', status: 'aisle'};
-    ac3Layout[17][4] = {id: 'ENTRY_BR', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
+    ac3Layout[17][0] = {id: 'ENTRY_BL_3A', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
+    ac3Layout[17][1] = {id: 'EMPTY_B1_3A', type: 'empty', status: 'empty'};
+    ac3Layout[17][2] = {id: 'EMPTY_B2_3A', type: 'empty', status: 'empty'};
+    ac3Layout[17][3] = {id: 'AISLE_B_3A', type: 'aisle', status: 'aisle'};
+    ac3Layout[17][4] = {id: 'EMPTY_B3_3A', type: 'empty', status: 'empty'};
 
-
-    // Define seat numbers and types for 8 bays (64 berths)
-    // Each bay has 8 seats. A "logical row" in ac3Layout represents a slice of the coach width.
-    // Two "logical rows" in ac3Layout often make up one full bay section.
     let currentSeatNum = 1;
     for (let bay = 0; bay < 8; bay++) {
-        const r1 = bay * 2 + 1; // First logical row for this bay
-        const r2 = r1 + 1;      // Second logical row for this bay
+        const r1 = bay * 2 + 1; 
+        const r2 = r1 + 1;      
 
-        // Main berths - Lower, Middle, Upper (3 per side)
-        // Bay X, Seats L, M, U (e.g., 1,2,3 and 4,5,6)
-        ac3Layout[r1][0] = { id: `S${currentSeatNum}`, number: `${currentSeatNum}`, type: 'lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac3Layout[r1][1] = { id: `S${currentSeatNum}`, number: `${currentSeatNum}`, type: 'middle', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac3Layout[r1][2] = { id: `S${currentSeatNum}`, number: `${currentSeatNum}`, type: 'upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        ac3Layout[r1][0] = { id: `S${currentSeatNum}_3A`, number: `${currentSeatNum}`, type: 'lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        ac3Layout[r1][1] = { id: `S${currentSeatNum}_3A`, number: `${currentSeatNum}`, type: 'middle', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        ac3Layout[r1][2] = { id: `S${currentSeatNum}_3A`, number: `${currentSeatNum}`, type: 'upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
         
-        ac3Layout[r2][0] = { id: `S${currentSeatNum}`, number: `${currentSeatNum}`, type: 'lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac3Layout[r2][1] = { id: `S${currentSeatNum}`, number: `${currentSeatNum}`, type: 'middle', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac3Layout[r2][2] = { id: `S${currentSeatNum}`, number: `${currentSeatNum}`, type: 'upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        ac3Layout[r2][0] = { id: `S${currentSeatNum}_3A`, number: `${currentSeatNum}`, type: 'lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        ac3Layout[r2][1] = { id: `S${currentSeatNum}_3A`, number: `${currentSeatNum}`, type: 'middle', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        ac3Layout[r2][2] = { id: `S${currentSeatNum}_3A`, number: `${currentSeatNum}`, type: 'upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
 
-        // Side berths - Side Lower, Side Upper (2 per side)
-        // Bay X, Seats SL, SU (e.g., 7, 8)
-        ac3Layout[r1][4] = { id: `S${currentSeatNum}`, number: `${currentSeatNum}`, type: 'side_lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac3Layout[r2][4] = { id: `S${currentSeatNum}`, number: `${currentSeatNum}`, type: 'side_upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        ac3Layout[r1][4] = { id: `S${currentSeatNum}_3A`, number: `${currentSeatNum}`, type: 'side_lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        ac3Layout[r2][4] = { id: `S${currentSeatNum}_3A`, number: `${currentSeatNum}`, type: 'side_upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
         
-        // Aisles for these rows
-        ac3Layout[r1][3] = { id: `AISLE${r1}`, type: 'aisle', status: 'aisle' };
-        ac3Layout[r2][3] = { id: `AISLE${r2}`, type: 'aisle', status: 'aisle' };
+        ac3Layout[r1][3] = { id: `AISLE${r1}_3A`, type: 'aisle', status: 'aisle' };
+        ac3Layout[r2][3] = { id: `AISLE${r2}_3A`, type: 'aisle', status: 'aisle' };
     }
     
-    // Assign originalColor based on type for all seats
     for (let i = 0; i < ac3Layout.length; i++) {
         for (let j = 0; j < ac3Layout[i].length; j++) {
             const seat = ac3Layout[i][j];
@@ -186,30 +173,92 @@ export default function TrainSeatAvailabilityPage() {
     return ac3Layout;
   }, []);
 
+  const generateAC2TierLayout = useCallback((): Seat[][] => {
+    // AC 2 Tier: Typically 4 main berths (2L, 2U) + 2 side berths (SL, SU) per bay.
+    // Structure for data (each inner array is a vertical column in horizontal view):
+    // [Lower, Upper, Empty (for visual spacing), Aisle, Side Lower/Upper]
+    const ac2Layout: Seat[][] = Array(18).fill(null).map(() => Array(5).fill(null).map(() => ({ id: `empty-${Math.random()}`, status: 'empty', type: 'empty' })));
+    const entryDisplayText = "ENTRY";
+
+    // Doors at the ends (similar to 3A but with _2A suffix for IDs)
+    ac2Layout[0][0] = {id: 'ENTRY_TL_2A', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
+    ac2Layout[0][1] = {id: 'EMPTY_T1_2A', type: 'empty', status: 'empty'}; // No middle
+    ac2Layout[0][2] = {id: 'EMPTY_T2_2A', type: 'empty', status: 'empty'};
+    ac2Layout[0][3] = {id: 'AISLE_T_2A', type: 'aisle', status: 'aisle'};
+    ac2Layout[0][4] = {id: 'EMPTY_T3_2A', type: 'empty', status: 'empty'};
+
+    ac2Layout[17][0] = {id: 'ENTRY_BL_2A', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
+    ac2Layout[17][1] = {id: 'EMPTY_B1_2A', type: 'empty', status: 'empty'}; // No middle
+    ac2Layout[17][2] = {id: 'EMPTY_B2_2A', type: 'empty', status: 'empty'};
+    ac2Layout[17][3] = {id: 'AISLE_B_2A', type: 'aisle', status: 'aisle'};
+    ac2Layout[17][4] = {id: 'EMPTY_B3_2A', type: 'empty', status: 'empty'};
+
+    let currentSeatNum = 1;
+    // Aiming for around 8 bays of 6 seats = 48 seats.
+    // Each bay is represented by 2 segments (columns)
+    for (let bay = 0; bay < 8; bay++) {
+        const segment1 = bay * 2 + 1; // First column for this bay
+        const segment2 = segment1 + 1;  // Second column for this bay
+
+        // Bay: Main Berths (Compartment 1: L, U; Compartment 2: L, U)
+        // Segment 1 (e.g., left side of compartment)
+        ac2Layout[segment1][0] = { id: `S${currentSeatNum}_2A`, number: `${currentSeatNum}`, type: 'lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        ac2Layout[segment1][1] = { id: `S${currentSeatNum}_2A`, number: `${currentSeatNum}`, type: 'upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        ac2Layout[segment1][2] = { id: `EMPTY_M1_${bay}_2A`, type: 'empty', status: 'empty' }; // Placeholder for middle berth slot
+
+        // Segment 2 (e.g., right side of compartment)
+        ac2Layout[segment2][0] = { id: `S${currentSeatNum}_2A`, number: `${currentSeatNum}`, type: 'lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        ac2Layout[segment2][1] = { id: `S${currentSeatNum}_2A`, number: `${currentSeatNum}`, type: 'upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        ac2Layout[segment2][2] = { id: `EMPTY_M2_${bay}_2A`, type: 'empty', status: 'empty' }; // Placeholder for middle berth slot
+
+        // Side Berths for this bay (across segment1 and segment2 for SL and SU)
+        ac2Layout[segment1][4] = { id: `S${currentSeatNum}_2A`, number: `${currentSeatNum}`, type: 'side_lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        ac2Layout[segment2][4] = { id: `S${currentSeatNum}_2A`, number: `${currentSeatNum}`, type: 'side_upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        
+        // Aisles for these segments
+        ac2Layout[segment1][3] = { id: `AISLE${segment1}_2A`, type: 'aisle', status: 'aisle' };
+        ac2Layout[segment2][3] = { id: `AISLE${segment2}_2A`, type: 'aisle', status: 'aisle' };
+    }
+    
+    // Assign originalColor based on type for all seats
+    for (let i = 0; i < ac2Layout.length; i++) {
+        for (let j = 0; j < ac2Layout[i].length; j++) {
+            const seat = ac2Layout[i][j];
+            if (seat.type && berthColors[seat.type]) {
+                seat.originalColor = berthColors[seat.type];
+            }
+        }
+    }
+    return ac2Layout;
+  }, []);
+
 
   useEffect(() => {
     if (selectedDateForCalendar && selectedClass && trainDetails) {
         let layoutToSet: Seat[][] = [];
         if (selectedClass === "3A") { 
             layoutToSet = generateAC3TierLayout();
+        } else if (selectedClass === "2A") {
+            layoutToSet = generateAC2TierLayout();
         } else { 
+            // Fallback for other classes - generic layout
             const rows = 10; 
-            const seatsVisualPerRow = 6;
+            const seatsVisualPerRow = 6; // 3 seats, aisle, 2 seats
             const newLayout: Seat[][] = [];
             for (let r = 0; r < rows; r++) {
                 const rowSeats: Seat[] = [];
                 for (let s = 0; s < seatsVisualPerRow; s++) {
-                const seatId = `${selectedClass}-R${r}S${s}`;
-                const seatNumber = `${String.fromCharCode(65 + r)}${s + 1}`;
-                let type: Seat['type'] = 'middle'; 
-                if (s === 0 || s === seatsVisualPerRow - 1) type = 'lower'; 
-                else if (s === 1 || s === seatsVisualPerRow - 2) type = 'middle';
-                else if (s === 2 || s === 3) type = 'aisle';
+                  const seatId = `${selectedClass}-R${r}S${s}`;
+                  const seatNumber = `${String.fromCharCode(65 + r)}${s + 1}`;
+                  let type: Seat['type'] = 'middle'; 
+                  if (s === 0 || s === seatsVisualPerRow -1 ) type = 'lower'; 
+                  else if (s === 1 || s === seatsVisualPerRow -2) type = 'upper'; // upper for non-AC, or can be window/aisle
+                  else if (s === 2 || s === 3) type = 'aisle'; // Middle seats could be aisle
 
-                rowSeats.push({
-                    id: seatId, number: seatNumber, status: Math.random() > 0.7 ? 'booked' : 'available', type: type,
-                    originalColor: berthColors.middle 
-                });
+                  rowSeats.push({
+                      id: seatId, number: seatNumber, status: Math.random() > 0.7 ? 'booked' : 'available', type: type,
+                      originalColor: berthColors.middle 
+                  });
                 }
                 newLayout.push(rowSeats);
             }
@@ -220,7 +269,7 @@ export default function TrainSeatAvailabilityPage() {
     } else {
         setCoachLayout([]); 
     }
-  }, [selectedDateForCalendar, selectedClass, trainDetails, generateAC3TierLayout]);
+  }, [selectedDateForCalendar, selectedClass, trainDetails, generateAC3TierLayout, generateAC2TierLayout]);
 
 
   const handleSeatClick = (seatId: string, seatNumber?: string, currentStatus?: Seat['status']) => {
@@ -364,12 +413,12 @@ export default function TrainSeatAvailabilityPage() {
                 </div>
 
 
-                {coachLayout.length > 0 && selectedClass === "3A" ? (
+                {coachLayout.length > 0 && (selectedClass === "3A" || selectedClass === "2A") ? (
                   <div className="mt-6">
-                    <h3 className="text-lg font-semibold mb-3 text-center">AC 3 Tier Coach Layout (Horizontal)</h3>
+                    <h3 className="text-lg font-semibold mb-3 text-center">{selectedClass} Coach Layout (Horizontal)</h3>
                      <div className="flex flex-row overflow-x-auto p-2 border rounded-md bg-muted/10 space-x-0.5 min-h-[200px]"> 
                         {coachLayout.map((segmentSeats, segmentIndex) => (
-                            <div key={`segment-${segmentIndex}`} className="flex flex-col space-y-0.5 items-center">
+                            <div key={`segment-${segmentIndex}-${selectedClass}`} className="flex flex-col space-y-0.5 items-center">
                                 {segmentSeats.map((seat) => {
                                     const seatBaseColor = seat.originalColor || berthColors[seat.type] || 'bg-gray-100';
                                     let displayColor = seatBaseColor;
@@ -431,12 +480,12 @@ export default function TrainSeatAvailabilityPage() {
                       </div>
                     )}
                   </div>
-                ) : coachLayout.length > 0 && selectedClass !== "3A" ? (
+                ) : coachLayout.length > 0 && selectedClass !== "3A" && selectedClass !== "2A" ? ( // Generic layout for other classes
                     <div className="mt-6"> 
                          <h3 className="text-lg font-semibold mb-2">Select Your Seats (Coach: {selectedClass})</h3>
                          <div className="border p-2 rounded-md bg-muted/20 max-w-md mx-auto">
                             {coachLayout.map((row, rowIndex) => (
-                            <div key={`row-${rowIndex}`} className="grid grid-cols-[repeat(3,minmax(0,1fr))_20px_repeat(3,minmax(0,1fr))] gap-1 mb-1">
+                            <div key={`row-${rowIndex}-${selectedClass}`} className="grid grid-cols-[repeat(3,minmax(0,1fr))_20px_repeat(3,minmax(0,1fr))] gap-1 mb-1">
                                 {row.slice(0,3).map(seat => (
                                     <div
                                         key={seat.id}
@@ -486,7 +535,7 @@ export default function TrainSeatAvailabilityPage() {
                   <Alert className="mt-6">
                     <XCircle className="h-4 w-4"/>
                     <AlertDescription>
-                      {selectedClass === "3A" ? "Generating AC 3 Tier layout..." : "No specific seat layout for this class in the demo, or data is still loading. Please select a valid date."}
+                      { (selectedClass === "3A" || selectedClass === "2A") ? `Generating ${selectedClass} layout...` : "No specific seat layout for this class in the demo, or data is still loading. Please select a valid date."}
                     </AlertDescription>
                   </Alert>
                 )}
