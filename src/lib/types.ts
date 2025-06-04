@@ -1,3 +1,4 @@
+
 export interface UserProfile {
   uid: string;
   email: string | null;
@@ -11,17 +12,23 @@ export interface Train {
   trainName: string;
   trainNumber: string;
   origin: string;
-  destination: string;
-  departureTime: string; 
-  arrivalTime: string;   
-  duration: string;      
+  destination:string;
+  departureTime: string;
+  arrivalTime: string;
+  duration: string;
   price: number;
-  availableClasses: Array<'economy' | 'business' | 'first'>;
+  availableClasses: Array<'economy' | 'business' | 'first' | '1A' | '2A' | '3A' | 'SL' | '2S'>;
 }
 
+export interface TrainDetailed extends Train {
+  // Specific fields for the detailed view if different from basic Train
+  // For now, it's the same as Train but can be extended
+}
+
+
 export interface Seat {
-  id: string; 
-  coach: string; 
+  id: string;
+  coach: string;
   status: 'available' | 'booked' | 'selected' | 'unavailable';
   type?: 'window' | 'aisle' | 'middle';
   number: string; // e.g. "1A", "12C"
@@ -35,11 +42,11 @@ export interface Booking {
   trainNumber: string;
   origin: string;
   destination: string;
-  bookingDate: string; 
+  bookingDate: string;
   travelDate: string;  // YYYY-MM-DD
   departureTime: string;
   arrivalTime: string;
-  seats: string[]; 
+  seats: string[];
   totalPrice: number;
   status: 'upcoming' | 'completed' | 'cancelled';
 }

@@ -1,189 +1,203 @@
 
-"use client"; 
+"use client";
 
 import { useParams, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import type { Seat } from '@/lib/types';
-import { Armchair, Loader2, Ticket } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import type { TrainDetailed } from '@/lib/types';
+import { Calendar as CalendarIconLucide, ChevronRight } from 'lucide-react'; // Renamed to avoid conflict
 import { useState, useEffect, useMemo } from 'react';
-import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
 import Link from 'next/link';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar } from "@/components/ui/calendar"; // ShadCN Calendar
+import { addMonths, format, getDate, startOfMonth } from 'date-fns';
 
-// Mock data for seats - in a real app, this would be fetched
-const generateMockSeats = (coachId: string, rows: number, seatsPerRow: number): Seat[] => {
-  const seats: Seat[] = [];
-  const letters = ['A', 'B', 'C', 'D', 'E', 'F'].slice(0, seatsPerRow);
-  for (let i = 1; i <= rows; i++) {
-    for (let j = 0; j < letters.length; j++) {
-      const seatId = `${coachId}-${i}${letters[j]}`;
-      const randomNumber = Math.random();
-      let status: Seat['status'] = 'available';
-      if (randomNumber < 0.3) status = 'booked';
-      // else if (randomNumber < 0.35) status = 'unavailable'; // Example of another status
-
-      seats.push({
-        id: seatId,
-        coach: coachId,
-        number: `${i}${letters[j]}`,
-        status: status,
-        type: j === 0 || j === letters.length - 1 ? 'window' : (j === 1 || j === letters.length - 2 ? 'aisle' : 'middle'),
-      });
-    }
-  }
-  return seats;
+// Mock data for a specific train - in a real app, this would be fetched
+const MOCK_TRAIN_DETAILS: Record<string, TrainDetailed> = {
+  'T001': { id: 'T001', trainName: 'Rajdhani Express', trainNumber: '12951', origin: 'New Delhi (NDLS)', destination: 'Mumbai Central (MMCT)', departureTime: '16:30', arrivalTime: '08:35', duration: '16h 05m', price: 2500, availableClasses: ['1A', '2A', '3A'] },
+  'T002': { id: 'T002', trainName: 'Shatabdi Express', trainNumber: '12002', origin: 'Chennai Egmore (MS)', destination: 'Bengaluru Cantt (BNC)', departureTime: '06:00', arrivalTime: '11:00', duration: '5h 00m', price: 1200, availableClasses: ['SL', '2S']},
+  // Add more mock trains if needed by trainId
 };
 
-const SeatAvailabilityGrid = ({ seats, selectedSeats, onSeatSelect }: { seats: Seat[], selectedSeats: string[], onSeatSelect: (seatId: string) => void }) => {
-  const seatsByCoach = useMemo(() => {
-    return seats.reduce((acc, seat) => {
-      if (!acc[seat.coach]) {
-        acc[seat.coach] = [];
-      }
-      acc[seat.coach].push(seat);
-      return acc;
-    }, {} as Record<string, Seat[]>);
-  }, [seats]);
-
-  return (
-    <div className="space-y-6">
-      {Object.entries(seatsByCoach).map(([coachId, coachSeats]) => (
-        <div key={coachId}>
-          <h3 className="text-lg font-semibold mb-2">Coach {coachId}</h3>
-          <div className="grid grid-cols-6 md:grid-cols-10 gap-2 p-4 border rounded-lg bg-muted/20">
-            {coachSeats.map((seat) => {
-              const isSelected = selectedSeats.includes(seat.id);
-              const isDisabled = seat.status === 'booked' || seat.status === 'unavailable';
-              return (
-                <Button
-                  key={seat.id}
-                  variant={isSelected ? 'default' : (isDisabled ? 'secondary': 'outline')}
-                  size="icon"
-                  className={cn(
-                    "h-10 w-10 md:h-12 md:w-12 transition-all duration-150 transform hover:scale-110",
-                    seat.status === 'booked' && "bg-destructive/50 text-destructive-foreground cursor-not-allowed",
-                    seat.status === 'unavailable' && "bg-muted text-muted-foreground cursor-not-allowed line-through",
-                    isSelected && "ring-2 ring-primary ring-offset-2"
-                  )}
-                  onClick={() => !isDisabled && onSeatSelect(seat.id)}
-                  disabled={isDisabled}
-                  aria-label={`Seat ${seat.number}, Status: ${isSelected ? 'selected' : seat.status}`}
-                >
-                  <Armchair size={20} />
-                </Button>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+const MOCK_AVAILABILITY_DATES = (baseDate: Date, count: number = 10) => {
+  return Array.from({ length: count }, (_, i) => {
+    const date = new Date(baseDate);
+    date.setDate(baseDate.getDate() + i);
+    return {
+      date: format(date, "yyyy-MM-dd"),
+      status: "Available", // Or some dynamic status
+    };
+  });
 };
 
 
-export default function SeatAvailabilityPage() {
+interface TrainDetailItemProps {
+  label: string;
+  value: string | undefined;
+}
+
+const TrainDetailItem: React.FC<TrainDetailItemProps> = ({ label, value }) => (
+  <div className="flex justify-between py-2 border-b border-gray-200">
+    <span className="text-sm text-muted-foreground">{label}</span>
+    <span className="text-sm font-medium">{value || '-'}</span>
+  </div>
+);
+
+export default function TrainSeatAvailabilityPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const { user, loading: authLoading } = useAuth();
 
   const trainId = params.trainId as string;
-  const origin = searchParams.get('origin') || 'Unknown Origin';
-  const destination = searchParams.get('destination') || 'Unknown Destination';
-  const date = searchParams.get('date') || new Date().toISOString().split('T')[0];
+  // These query params might be from a previous step or direct navigation
+  const queryOrigin = searchParams.get('origin');
+  const queryDestination = searchParams.get('destination');
+  const queryDate = searchParams.get('date');
 
-
-  const [seats, setSeats] = useState<Seat[]>([]);
-  const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
+  const [trainDetails, setTrainDetails] = useState<TrainDetailed | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isBooking, setIsBooking] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState<Date>(queryDate ? new Date(queryDate) : new Date());
+  const [selectedClass, setSelectedClass] = useState<string>("3A"); // Default class
 
   useEffect(() => {
     setIsLoading(true);
+    // Simulate fetching train details
     setTimeout(() => {
-      const mockCoachS1 = generateMockSeats('S1', 12, 6); // Typical sleeper coach
-      const mockCoachC1 = generateMockSeats('C1', 8, 5); // AC Chair car
-      setSeats([...mockCoachS1, ...mockCoachC1]);
+      const details = MOCK_TRAIN_DETAILS[trainId];
+      if (details) {
+        setTrainDetails(details);
+        // Set default selected class if available for this train
+        if (details.availableClasses.length > 0 && !details.availableClasses.includes(selectedClass as any)) {
+           setSelectedClass(details.availableClasses[0] as string);
+        } else if (details.availableClasses.length > 0 && details.availableClasses.includes(selectedClass as any)) {
+          // keep current selected class
+        } else {
+           setSelectedClass("3A"); // fallback
+        }
+
+      } else {
+        toast({ title: "Error", description: "Train details not found.", variant: "destructive" });
+      }
       setIsLoading(false);
-    }, 1000);
-  }, [trainId]);
+    }, 500);
+  }, [trainId, toast, selectedClass]);
 
-  const handleSeatSelect = (seatId: string) => {
-    setSelectedSeats((prevSelected) =>
-      prevSelected.includes(seatId)
-        ? prevSelected.filter((id) => id !== seatId)
-        : [...prevSelected, seatId]
-    );
-  };
-
-  const handleBooking = () => {
-    if (!user) {
-      toast({ title: "Authentication Required", description: "Please log in to book tickets.", variant: "destructive" });
-      return;
+  const availabilityDates = useMemo(() => {
+    // Use queryDate or today if not available, then adjust to 20th of that month as per image example for starting list
+    let baseDateForList = queryDate ? new Date(queryDate) : new Date();
+    if (getDate(baseDateForList) < 20) { // If date is before 20th, start list from 20th
+        baseDateForList.setDate(20);
     }
-    if(selectedSeats.length === 0) {
-      toast({ title: "No Seats Selected", description: "Please select at least one seat.", variant: "destructive" });
-      return;
+    // Ensure the list doesn't go into the past unnecessarily if current month is later
+    if(baseDateForList < new Date() && getDate(new Date()) >= 20) {
+      baseDateForList = new Date();
+      baseDateForList.setDate(20);
+    } else if (baseDateForList < new Date()) {
+      baseDateForList = new Date();
     }
 
-    setIsBooking(true);
-    setTimeout(() => {
-      toast({
-        title: "Booking Successful!",
-        description: `Booked ${selectedSeats.length} seat(s) for train ${trainId}. Seat IDs: ${selectedSeats.join(', ')}`,
-        action: <Button variant="outline" size="sm" asChild><Link href="/bookings">View Bookings</Link></Button>
-      });
-      setSelectedSeats([]);
-      setIsBooking(false);
-    }, 2000);
-  };
+    return MOCK_AVAILABILITY_DATES(baseDateForList);
+  }, [queryDate]);
 
-  if (isLoading || authLoading) {
-    return <div className="flex justify-center items-center min-h-[calc(100vh-200px)]"><Loader2 className="h-16 w-16 animate-spin text-primary" /></div>;
+
+  if (isLoading) {
+    return <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">Loading...</div>;
   }
 
-  const totalPrice = selectedSeats.length * 500; // Assuming a flat price of ₹500 per seat for mock
+  if (!trainDetails) {
+    return <div className="text-center py-10">Train details not found.</div>;
+  }
+
+  const breadcrumbOrigin = queryOrigin || trainDetails.origin;
+  const breadcrumbDestination = queryDestination || trainDetails.destination;
 
   return (
-    <div className="space-y-8">
-      <Card className="shadow-xl">
-        <CardHeader>
-          <CardTitle className="text-3xl font-headline">Select Your Seats</CardTitle>
-          <CardDescription>
-            Train ID: {trainId} <br />
-            Route: {origin} to {destination} on {new Date(date).toLocaleDateString()}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <SeatAvailabilityGrid seats={seats} selectedSeats={selectedSeats} onSeatSelect={handleSeatSelect} />
-           <div className="mt-6 p-4 border rounded-lg bg-background">
-            <h4 className="font-semibold mb-2">Legend:</h4>
-            <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
-              <div className="flex items-center"><Armchair className="mr-1 h-5 w-5 text-primary" /> Available</div>
-              <div className="flex items-center"><Armchair className="mr-1 h-5 w-5 text-accent" /> Selected</div>
-              <div className="flex items-center"><Armchair className="mr-1 h-5 w-5 text-destructive/70" /> Booked</div>
-              <div className="flex items-center"><Armchair className="mr-1 h-5 w-5 text-muted-foreground" /> Unavailable</div>
-            </div>
-          </div>
-        </CardContent>
-        <CardFooter className="flex flex-col md:flex-row justify-between items-center gap-4">
-          <div>
-            <p className="text-lg font-semibold">Selected Seats: {selectedSeats.length}</p>
-            <p className="text-xl font-bold text-accent">Total Price: ₹{totalPrice.toFixed(2)}</p>
-          </div>
-          <Button 
-            size="lg" 
-            onClick={handleBooking} 
-            disabled={selectedSeats.length === 0 || isBooking || !user}
-            className="w-full md:w-auto"
-          >
-            {isBooking ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Ticket className="mr-2 h-5 w-5" />}
-            {user ? (isBooking ? 'Processing...' : 'Book Selected Seats') : 'Login to Book'}
-          </Button>
-        </CardFooter>
-      </Card>
+    <div className="container mx-auto px-4 py-8 space-y-8 max-w-4xl">
+      {/* Breadcrumbs */}
+      <nav className="text-sm text-muted-foreground flex items-center space-x-2">
+        <Link href="/" className="hover:underline">Train Tickets</Link>
+        <ChevronRight size={16} />
+        <Link href={`/?origin=${encodeURIComponent(breadcrumbOrigin)}&destination=${encodeURIComponent(breadcrumbDestination)}`} className="hover:underline">Train Between Stations</Link>
+        <ChevronRight size={16} />
+        <span>{breadcrumbOrigin.split('(')[0].trim()} to {breadcrumbDestination.split('(')[0].trim()}</span>
+      </nav>
+
+      <h1 className="text-3xl font-bold">Train Seat Availability</h1>
+
+      {/* Train Details Section */}
+      <section>
+        <h2 className="text-xl font-semibold mb-3">Train Details</h2>
+        <Card className="shadow-none border">
+          <CardContent className="p-4 space-y-1">
+            <TrainDetailItem label="Train Name" value={trainDetails.trainName} />
+            <TrainDetailItem label="Train Number" value={trainDetails.trainNumber} />
+            <TrainDetailItem label="Source Station" value={trainDetails.origin} />
+            <TrainDetailItem label="Destination Station" value={trainDetails.destination} />
+            <TrainDetailItem label="Departure Time" value={trainDetails.departureTime} />
+            <TrainDetailItem label="Arrival Time" value={trainDetails.arrivalTime} />
+            <TrainDetailItem label="Duration" value={trainDetails.duration} />
+          </CardContent>
+        </Card>
+      </section>
+
+      {/* Availability Section */}
+      <section>
+        <h2 className="text-xl font-semibold mb-3">Availability</h2>
+        <Tabs value={selectedClass} onValueChange={setSelectedClass} className="w-full">
+          <TabsList className="grid w-full grid-cols-5 mb-4">
+            {['1A', '2A', '3A', 'SL', '2S'].map(cls => (
+              <TabsTrigger key={cls} value={cls} disabled={!trainDetails.availableClasses.includes(cls as any)}>
+                {cls}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+
+          <TabsContent value={selectedClass}>
+            <Card className="shadow-none border">
+              <CardContent className="p-4">
+                <Calendar
+                  mode="single" // Still single for selection, but displays multiple months
+                  selected={queryDate ? new Date(queryDate) : undefined}
+                  onSelect={(date) => {
+                    // Handle date selection logic, e.g., update queryDate or navigate
+                    if (date) {
+                        const newURL = `/trains/${trainId}/seats?origin=${encodeURIComponent(breadcrumbOrigin)}&destination=${encodeURIComponent(breadcrumbDestination)}&date=${format(date, 'yyyy-MM-dd')}`;
+                        window.history.pushState({}, '', newURL); // Or use Next Router for navigation
+                        setCurrentMonth(startOfMonth(date)); // Update currentMonth to reflect selection
+                        toast({title: "Date Selected", description: `Showing availability for ${format(date, "PPP")}`});
+                    }
+                  }}
+                  month={currentMonth}
+                  onMonthChange={setCurrentMonth}
+                  numberOfMonths={2}
+                  className="rounded-md "
+                  disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1))} // Disable past dates
+                />
+
+                <div className="mt-6 space-y-2">
+                  <div className="flex justify-between font-semibold text-sm px-2 py-1 border-b">
+                    <span>Date</span>
+                    <span>Status</span>
+                  </div>
+                  {availabilityDates.map((item) => (
+                    <div key={item.date} className="flex justify-between items-center text-sm px-2 py-3 border-b border-gray-200 last:border-b-0">
+                      <span>{format(new Date(item.date + "T00:00:00"), "dd MMM yyyy")}</span>
+                      {item.status === "Available" ? (
+                        <Button variant="outline" size="sm" className="bg-green-100 text-green-700 border-green-300 hover:bg-green-200">
+                          Available
+                        </Button>
+                      ) : (
+                        <span className="text-red-500">{item.status}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </section>
     </div>
   );
 }
