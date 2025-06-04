@@ -45,32 +45,32 @@ body {
   }
 
   .dark {
-    /* Dark theme remains largely default, can be customized further if needed */
-    --background: 0 0% 3.9%;
+    --background: 0 0% 12%; /* Adjusted from 3.9% */
     --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
+    --card: 0 0% 12%; /* Adjusted from 3.9% */
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
+    --popover: 0 0% 12%; /* Adjusted from 3.9% */
     --popover-foreground: 0 0% 98%;
-    --primary: 272 100% 70%; /* Lighter Deep Indigo for dark mode */
+    --primary: 272 100% 70%; 
     --primary-foreground: 0 0% 9%; 
-    --secondary: 0 0% 14.9%;
+    --secondary: 0 0% 16%; /* Adjusted from 14.9% */
     --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
+    --muted: 0 0% 15%; /* Adjusted from 14.9% */
     --muted-foreground: 0 0% 63.9%;
-    --accent: 180 100% 45%; /* Lighter Teal for dark mode */
+    --accent: 180 100% 45%; 
     --accent-foreground: 0 0% 9%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
+    --border: 0 0% 18%; /* Adjusted from 14.9% */
+    --input: 0 0% 15%; /* Adjusted from 14.9% */
     --ring: 180 100% 45%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    --sidebar-background: 240 5.9% 10%;
+    /* Sidebar colors can be adjusted if they now clash, for now keeping them as they are already somewhat lighter */
+    --sidebar-background: 240 5.9% 10%; 
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
