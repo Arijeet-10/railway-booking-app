@@ -59,42 +59,7 @@ export default function HomePage() {
       
       <Separator />
 
-      <section>
-        <h2 className="text-3xl font-headline font-semibold mb-6 text-center md:text-left">Popular Destinations</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[
-            { city: 'New Delhi (NDLS)', hint: 'India Gate', description: "Explore the capital city of India." }, 
-            { city: 'Mumbai Central (MMCT)', hint: 'Gateway of India', description: "Discover the financial capital." }, 
-            { city: 'Jaipur Jn (JP)', hint: 'Hawa Mahal', description: "Experience the Pink City's charm." }
-          ].map(dest => (
-            <Card key={dest.city} className="overflow-hidden hover:shadow-xl transition-shadow">
-              <Image 
-                src={`https://placehold.co/600x400.png`} 
-                alt={dest.city} 
-                width={600} 
-                height={400} 
-                className="w-full h-48 object-cover"
-                data-ai-hint={dest.hint}
-              />
-              <CardHeader>
-                <CardTitle>{dest.city.split('(')[0].trim()}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">{dest.description}</p>
-              </CardContent>
-              <CardFooter>
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => handleTrainSearch({origin: "Any Station", destination: dest.city, date: new Date()})}
-                >
-                  Explore Trains to {dest.city.split('(')[0].trim()}
-                </Button>
-              </CardFooter>
-            </Card>
-          ))}
-        </div>
-      </section>
+      {/* Popular Destinations section removed */}
 
       <section>
         <h2 className="text-2xl font-semibold mb-4 text-center md:text-left">
