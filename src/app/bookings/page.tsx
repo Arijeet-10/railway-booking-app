@@ -6,13 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import Image from 'next/image';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Ticket } from 'lucide-react';
-
-// Mock data for bookings - Indian context
-const MOCK_BOOKINGS: Booking[] = [
-  { id: 'B001', userId: 'user1', trainId: 'T001', trainName: 'Rajdhani Express', trainNumber: '12301', origin: 'New Delhi', destination: 'Mumbai Central', bookingDate: '2023-10-15T10:00:00Z', travelDate: '2024-07-20', departureTime: '17:00', arrivalTime: '09:00', seats: ['A1', 'A2'], totalPrice: 5000, status: 'upcoming' },
-  { id: 'B002', userId: 'user1', trainId: 'T002', trainName: 'Shatabdi Express', trainNumber: '12002', origin: 'Chennai Egmore', destination: 'Bengaluru Cantt', bookingDate: '2023-09-01T14:30:00Z', travelDate: '2024-05-10', departureTime: '06:00', arrivalTime: '11:00', seats: ['C5'], totalPrice: 1200, status: 'completed' },
-  { id: 'B003', userId: 'user1', trainId: 'T003', trainName: 'Himalayan Queen', trainNumber: '14095', origin: 'Kalka', destination: 'Shimla', bookingDate: '2024-01-05T09:15:00Z', travelDate: '2024-02-15', departureTime: '12:10', arrivalTime: '17:30', seats: ['B10'], totalPrice: 750, status: 'cancelled' },
-];
+import { MOCK_BOOKINGS } from '@/lib/mock-data'; // Import MOCK_BOOKINGS
 
 export default function BookingsPage() {
   const upcomingBookings = MOCK_BOOKINGS.filter(b => b.status === 'upcoming');

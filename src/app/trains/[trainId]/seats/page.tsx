@@ -3,22 +3,16 @@
 
 import { useParams, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import type { TrainDetailed } from '@/lib/types';
-import { Calendar as CalendarIconLucide, ChevronRight } from 'lucide-react'; // Renamed to avoid conflict
+import { ChevronRight } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar } from "@/components/ui/calendar"; // ShadCN Calendar
-import { addMonths, format, getDate, startOfMonth } from 'date-fns';
-
-// Mock data for a specific train - in a real app, this would be fetched
-const MOCK_TRAIN_DETAILS: Record<string, TrainDetailed> = {
-  'T001': { id: 'T001', trainName: 'Rajdhani Express', trainNumber: '12951', origin: 'New Delhi (NDLS)', destination: 'Mumbai Central (MMCT)', departureTime: '16:30', arrivalTime: '08:35', duration: '16h 05m', price: 2500, availableClasses: ['1A', '2A', '3A'] },
-  'T002': { id: 'T002', trainName: 'Shatabdi Express', trainNumber: '12002', origin: 'Chennai Egmore (MS)', destination: 'Bengaluru Cantt (BNC)', departureTime: '06:00', arrivalTime: '11:00', duration: '5h 00m', price: 1200, availableClasses: ['SL', '2S']},
-  // Add more mock trains if needed by trainId
-};
+import { Calendar } from "@/components/ui/calendar"; 
+import { format, getDate, startOfMonth } from 'date-fns';
+import { MOCK_TRAINS } from '@/lib/mock-data'; // Import MOCK_TRAINS
 
 const MOCK_AVAILABILITY_DATES = (baseDate: Date, count: number = 10) => {
   return Array.from({ length: count }, (_, i) => {
@@ -26,11 +20,10 @@ const MOCK_AVAILABILITY_DATES = (baseDate: Date, count: number = 10) => {
     date.setDate(baseDate.getDate() + i);
     return {
       date: format(date, "yyyy-MM-dd"),
-      status: "Available", // Or some dynamic status
+      status: "Available", 
     };
   });
 };
-
 
 interface TrainDetailItemProps {
   label: string;
@@ -50,7 +43,6 @@ export default function TrainSeatAvailabilityPage() {
   const { toast } = useToast();
 
   const trainId = params.trainId as string;
-  // These query params might be from a previous step or direct navigation
   const queryOrigin = searchParams.get('origin');
   const queryDestination = searchParams.get('destination');
   const queryDate = searchParams.get('date');
@@ -62,41 +54,48 @@ export default function TrainSeatAvailabilityPage() {
 
   useEffect(() => {
     setIsLoading(true);
-    // Simulate fetching train details
-    setTimeout(() => {
-      const details = MOCK_TRAIN_DETAILS[trainId];
+    setTrainDetails(null); // Clear previous train details
+    
+    const timer = setTimeout(() => {
+      const details = MOCK_TRAINS.find(train => train.id === trainId);
       if (details) {
         setTrainDetails(details);
-        // Set default selected class if available for this train
-        if (details.availableClasses.length > 0 && !details.availableClasses.includes(selectedClass as any)) {
-           setSelectedClass(details.availableClasses[0] as string);
-        } else if (details.availableClasses.length > 0 && details.availableClasses.includes(selectedClass as any)) {
-          // keep current selected class
-        } else {
-           setSelectedClass("3A"); // fallback
-        }
-
       } else {
         toast({ title: "Error", description: "Train details not found.", variant: "destructive" });
       }
       setIsLoading(false);
-    }, 500);
-  }, [trainId, toast, selectedClass]);
+    }, 100); // Shorter delay for mock data
+
+    return () => clearTimeout(timer);
+  }, [trainId, toast]);
+
+  useEffect(() => {
+    // This effect updates selectedClass if the current one isn't valid for the loaded trainDetails
+    if (trainDetails) {
+        const availableStandardClasses = ['1A', '2A', '3A', 'SL', '2S'].filter(cls =>
+            trainDetails.availableClasses.includes(cls as any)
+        );
+        if (availableStandardClasses.length > 0) {
+            if (!availableStandardClasses.includes(selectedClass)) {
+                setSelectedClass(availableStandardClasses[0]);
+            }
+        }
+        // If no standard classes, selectedClass remains as is, and tabs will be disabled by their own logic.
+    }
+  }, [trainDetails, selectedClass, setSelectedClass]);
+
 
   const availabilityDates = useMemo(() => {
-    // Use queryDate or today if not available, then adjust to 20th of that month as per image example for starting list
     let baseDateForList = queryDate ? new Date(queryDate) : new Date();
-    if (getDate(baseDateForList) < 20) { // If date is before 20th, start list from 20th
+    if (getDate(baseDateForList) < 20) { 
         baseDateForList.setDate(20);
     }
-    // Ensure the list doesn't go into the past unnecessarily if current month is later
     if(baseDateForList < new Date() && getDate(new Date()) >= 20) {
       baseDateForList = new Date();
       baseDateForList.setDate(20);
     } else if (baseDateForList < new Date()) {
       baseDateForList = new Date();
     }
-
     return MOCK_AVAILABILITY_DATES(baseDateForList);
   }, [queryDate]);
 
@@ -106,7 +105,7 @@ export default function TrainSeatAvailabilityPage() {
   }
 
   if (!trainDetails) {
-    return <div className="text-center py-10">Train details not found.</div>;
+    return <div className="text-center py-10">Train details not found. Please check the train ID or try again later.</div>;
   }
 
   const breadcrumbOrigin = queryOrigin || trainDetails.origin;
@@ -114,7 +113,6 @@ export default function TrainSeatAvailabilityPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 space-y-8 max-w-4xl">
-      {/* Breadcrumbs */}
       <nav className="text-sm text-muted-foreground flex items-center space-x-2">
         <Link href="/" className="hover:underline">Train Tickets</Link>
         <ChevronRight size={16} />
@@ -125,7 +123,6 @@ export default function TrainSeatAvailabilityPage() {
 
       <h1 className="text-3xl font-bold">Train Seat Availability</h1>
 
-      {/* Train Details Section */}
       <section>
         <h2 className="text-xl font-semibold mb-3">Train Details</h2>
         <Card className="shadow-none border">
@@ -141,13 +138,16 @@ export default function TrainSeatAvailabilityPage() {
         </Card>
       </section>
 
-      {/* Availability Section */}
       <section>
         <h2 className="text-xl font-semibold mb-3">Availability</h2>
         <Tabs value={selectedClass} onValueChange={setSelectedClass} className="w-full">
           <TabsList className="grid w-full grid-cols-5 mb-4">
             {['1A', '2A', '3A', 'SL', '2S'].map(cls => (
-              <TabsTrigger key={cls} value={cls} disabled={!trainDetails.availableClasses.includes(cls as any)}>
+              <TabsTrigger 
+                key={cls} 
+                value={cls} 
+                disabled={!trainDetails.availableClasses.includes(cls as any)}
+              >
                 {cls}
               </TabsTrigger>
             ))}
@@ -157,14 +157,13 @@ export default function TrainSeatAvailabilityPage() {
             <Card className="shadow-none border">
               <CardContent className="p-4">
                 <Calendar
-                  mode="single" // Still single for selection, but displays multiple months
+                  mode="single" 
                   selected={queryDate ? new Date(queryDate) : undefined}
                   onSelect={(date) => {
-                    // Handle date selection logic, e.g., update queryDate or navigate
                     if (date) {
                         const newURL = `/trains/${trainId}/seats?origin=${encodeURIComponent(breadcrumbOrigin)}&destination=${encodeURIComponent(breadcrumbDestination)}&date=${format(date, 'yyyy-MM-dd')}`;
-                        window.history.pushState({}, '', newURL); // Or use Next Router for navigation
-                        setCurrentMonth(startOfMonth(date)); // Update currentMonth to reflect selection
+                        window.history.pushState({}, '', newURL); 
+                        setCurrentMonth(startOfMonth(date)); 
                         toast({title: "Date Selected", description: `Showing availability for ${format(date, "PPP")}`});
                     }
                   }}
@@ -172,7 +171,7 @@ export default function TrainSeatAvailabilityPage() {
                   onMonthChange={setCurrentMonth}
                   numberOfMonths={2}
                   className="rounded-md "
-                  disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1))} // Disable past dates
+                  disabled={(date) => date < new Date(new Date().setDate(new Date().getDate() -1))} 
                 />
 
                 <div className="mt-6 space-y-2">

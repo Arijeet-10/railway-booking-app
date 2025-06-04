@@ -12,25 +12,7 @@ import { useState } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Search } from 'lucide-react';
-
-// Mock data for train search results - Indian context
-const MOCK_TRAINS: Train[] = [
-  { id: 'T001', trainName: 'Rajdhani Express', trainNumber: '12301', origin: 'New Delhi (NDLS)', destination: 'Mumbai Central (MMCT)', departureTime: '17:00', arrivalTime: '09:00', duration: '16h 00m', price: 2500, availableClasses: ['economy', 'business'] },
-  { id: 'T002', trainName: 'Shatabdi Express', trainNumber: '12002', origin: 'Chennai Egmore (MS)', destination: 'Bengaluru Cantt (BNC)', departureTime: '06:00', arrivalTime: '11:00', duration: '5h 00m', price: 1200, availableClasses: ['economy', 'business', 'first'] },
-  { id: 'T003', trainName: 'Deccan Queen', trainNumber: '12124', origin: 'Pune Jn (PUNE)', destination: 'Chhatrapati Shivaji Maharaj Terminus (CSMT)', departureTime: '07:15', arrivalTime: '10:25', duration: '3h 10m', price: 450, availableClasses: ['economy'] },
-  { id: 'T004', trainName: 'Coromandel Express', trainNumber: '12841', origin: 'Kolkata Shalimar (SHM)', destination: 'Chennai Central (MAS)', departureTime: '14:50', arrivalTime: '17:00', duration: '26h 10m', price: 1800, availableClasses: ['economy', 'business'] },
-  { id: 'T005', trainName: 'Kacheguda Express', trainNumber: '12786', origin: 'KSR Bengaluru City Junction (SBC)', destination: 'Hyderabad Deccan Nampally (HYB)', departureTime: '18:20', arrivalTime: '05:40', duration: '11h 20m', price: 950, availableClasses: ['economy', 'business'] },
-  { id: 'T006', trainName: 'Ashram Express', trainNumber: '12915', origin: 'Ahmedabad Jn (ADI)', destination: 'Jaipur Jn (JP)', departureTime: '19:30', arrivalTime: '05:45', duration: '10h 15m', price: 800, availableClasses: ['economy'] },
-  { id: 'T007', trainName: 'Tejas Express', trainNumber: '82501', origin: 'Lucknow Charbagh NR (LKO)', destination: 'New Delhi (NDLS)', departureTime: '06:10', arrivalTime: '12:25', duration: '6h 15m', price: 1500, availableClasses: ['business', 'first'] },
-  { id: 'T008', trainName: 'North East Express', trainNumber: '12506', origin: 'Anand Vihar Terminal (ANVT)', destination: 'Kamakhya Jn (KYQ)', departureTime: '07:40', arrivalTime: '16:25', duration: '32h 45m', price: 1100, availableClasses: ['economy', 'business'] },
-  { id: 'T009', trainName: 'Nagpur Pune Superfast', trainNumber: '12136', origin: 'Nagpur Jn (NGP)', destination: 'Pune Jn (PUNE)', departureTime: '18:00', arrivalTime: '09:45', duration: '15h 45m', price: 1050, availableClasses: ['economy'] },
-  { id: 'T010', trainName: 'Marudhar Express', trainNumber: '14854', origin: 'Jaipur Jn (JP)', destination: 'Varanasi Jn (BSB)', departureTime: '13:45', arrivalTime: '06:15', duration: '16h 30m', price: 700, availableClasses: ['economy', 'business'] },
-  { id: 'T011', trainName: 'Kalka Mail', trainNumber: '12311', origin: 'Kolkata Howrah Jn (HWH)', destination: 'Kalka (KLK)', departureTime: '19:40', arrivalTime: '04:30', duration: '32h 50m', price: 1750, availableClasses: ['economy', 'business', 'first'] },
-  { id: 'T012', trainName: 'Jammu Rajdhani', trainNumber: '12425', origin: 'New Delhi (NDLS)', destination: 'Jammu Tawi (JAT)', departureTime: '20:40', arrivalTime: '05:00', duration: '8h 20m', price: 2200, availableClasses: ['business', 'first'] },
-  { id: 'T013', trainName: 'Saraighat Express', trainNumber: '12345', origin: 'Kolkata Howrah Jn (HWH)', destination: 'Guwahati (GHY)', departureTime: '15:50', arrivalTime: '09:50', duration: '18h 00m', price: 1300, availableClasses: ['economy', 'business'] },
-  { id: 'T014', trainName: 'Duronto Express', trainNumber: '12273', origin: 'Kolkata Howrah Jn (HWH)', destination: 'New Delhi (NDLS)', departureTime: '08:35', arrivalTime: '06:00', duration: '21h 25m', price: 2800, availableClasses: ['first', 'business'] },
-  { id: 'T015', trainName: 'Gitanjali Express', trainNumber: '12860', origin: 'Kolkata Howrah Jn (HWH)', destination: 'Chhatrapati Shivaji Maharaj Terminus (CSMT)', departureTime: '13:50', arrivalTime: '21:20', duration: '31h 30m', price: 1900, availableClasses: ['economy', 'business'] },
-];
+import { MOCK_TRAINS } from '@/lib/mock-data'; // Import MOCK_TRAINS
 
 export default function HomePage() {
   const [displayedTrains, setDisplayedTrains] = useState<Train[]>(MOCK_TRAINS);
@@ -60,7 +42,7 @@ export default function HomePage() {
       toast({
         title: "No Trains Found",
         description: `No trains found for the route from ${origin} to ${destination}. Please try different stations.`,
-        variant: "default", // Changed from destructive to default as it's a valid search outcome
+        variant: "default", 
       });
     }
   };
@@ -81,9 +63,9 @@ export default function HomePage() {
         <h2 className="text-3xl font-headline font-semibold mb-6 text-center md:text-left">Popular Destinations</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[
-            { city: 'New Delhi', hint: 'India Gate', description: "Explore the capital city of India." }, 
-            { city: 'Mumbai', hint: 'Gateway of India', description: "Discover the financial capital." }, 
-            { city: 'Jaipur', hint: 'Hawa Mahal', description: "Experience the Pink City's charm." }
+            { city: 'New Delhi (NDLS)', hint: 'India Gate', description: "Explore the capital city of India." }, 
+            { city: 'Mumbai Central (MMCT)', hint: 'Gateway of India', description: "Discover the financial capital." }, 
+            { city: 'Jaipur Jn (JP)', hint: 'Hawa Mahal', description: "Experience the Pink City's charm." }
           ].map(dest => (
             <Card key={dest.city} className="overflow-hidden hover:shadow-xl transition-shadow">
               <Image 
@@ -95,19 +77,18 @@ export default function HomePage() {
                 data-ai-hint={dest.hint}
               />
               <CardHeader>
-                <CardTitle>{dest.city}</CardTitle>
+                <CardTitle>{dest.city.split('(')[0].trim()}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">{dest.description}</p>
               </CardContent>
               <CardFooter>
-                {/* This button could also trigger a search for this city as destination */}
                 <Button 
                   variant="outline" 
                   className="w-full"
                   onClick={() => handleTrainSearch({origin: "Any Station", destination: dest.city, date: new Date()})}
                 >
-                  Explore Trains to {dest.city}
+                  Explore Trains to {dest.city.split('(')[0].trim()}
                 </Button>
               </CardFooter>
             </Card>
@@ -135,7 +116,7 @@ export default function HomePage() {
             ))}
           </div>
         )}
-         {!searchPerformed && displayedTrains.length === 0 && ( // Should not happen if initial is MOCK_TRAINS
+         {!searchPerformed && displayedTrains.length === 0 && ( 
              <Alert>
                 <Search className="h-4 w-4" />
                 <AlertTitle>No Trains Listed</AlertTitle>
