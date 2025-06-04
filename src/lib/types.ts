@@ -75,3 +75,11 @@ export type PopularRoute = {
 
 // AI Flow specific types (already defined in smart-train-suggestions.ts, re-exporting or aligning for consistency)
 export type { SmartTrainSuggestionsInput, SmartTrainSuggestionsOutput } from '@/ai/flows/smart-train-suggestions';
+
+// Chatbot Message Type
+export interface ChatMessage {
+  id: string;
+  role: 'user' | 'bot';
+  content: string;
+  timestamp: Date;
+}
