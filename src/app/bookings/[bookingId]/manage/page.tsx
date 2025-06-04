@@ -14,6 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, AlertTriangle, Ticket, CalendarDays, Users, MapPin, Trash2, Download, Edit3, ArrowLeft } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import jsPDF from 'jspdf';
 
 export default function ManageBookingPage() {
   const params = useParams();
@@ -86,10 +87,72 @@ export default function ManageBookingPage() {
   };
 
   const handleDownloadTicket = () => {
-    // Placeholder
-     toast({
-        title: "Download Ticket (Not Implemented)",
-        description: "This feature will be available soon.",
+    if (!booking) {
+      toast({ title: "Error", description: "Booking details not loaded.", variant: "destructive" });
+      return;
+    }
+
+    const doc = new jsPDF();
+    let yPos = 20; // Initial Y position for text
+
+    doc.setFontSize(18);
+    doc.text("RailEase - Train Ticket", 105, yPos, { align: "center" });
+    yPos += 10;
+
+    doc.setFontSize(12);
+    doc.text(`Booking ID: ${booking.id}`, 20, yPos);
+    yPos += 7;
+    doc.text(`Booked on: ${new Date(booking.bookingDate).toLocaleString()}`, 20, yPos);
+    yPos += 10;
+
+    doc.setFontSize(14);
+    doc.text(`${booking.trainName} (${booking.trainNumber})`, 20, yPos);
+    yPos += 7;
+    doc.setFontSize(12);
+    doc.text(`Route: ${booking.origin} to ${booking.destination}`, 20, yPos);
+    yPos += 7;
+    doc.text(`Travel Date: ${new Date(booking.travelDate + "T00:00:00").toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 20, yPos);
+    yPos += 7;
+    doc.text(`Departure: ${booking.departureTime} - Arrival: ${booking.arrivalTime}`, 20, yPos);
+    yPos += 7;
+    doc.text(`Class: ${booking.selectedClass.toUpperCase()}`, 20, yPos);
+    yPos += 10;
+
+    doc.setFontSize(14);
+    doc.text("Passenger Details:", 20, yPos);
+    yPos += 7;
+    doc.setFontSize(10);
+    if (booking.passengersList && booking.passengersList.length > 0) {
+      booking.passengersList.forEach((p, index) => {
+        doc.text(`${index + 1}. ${p.name} (Age: ${p.age}, Gender: ${p.gender}, Berth: ${p.preferredBerth.replace(/_/g, ' ')})`, 25, yPos);
+        yPos += 6;
+        if (yPos > 270) { // Page break if content is too long
+          doc.addPage();
+          yPos = 20;
+        }
+      });
+    } else {
+      doc.text("No passenger details available (using legacy seat names).", 25, yPos);
+      yPos += 6;
+      booking.seats.forEach((seat, index) => {
+         doc.text(`${index + 1}. Seat: ${seat}`, 25, yPos);
+         yPos +=6;
+         if (yPos > 270) { doc.addPage(); yPos = 20; }
+      });
+    }
+    yPos += 10;
+
+    doc.setFontSize(12);
+    doc.text(`Total Price: INR ${booking.totalPrice.toFixed(2)}`, 20, yPos);
+    yPos += 15;
+
+    doc.setFontSize(10);
+    doc.text("Thank you for choosing RailEase! Happy Journey!", 105, yPos, { align: "center" });
+
+    doc.save(`RailEase-Ticket-${booking.id}.pdf`);
+    toast({
+        title: "Ticket Downloading",
+        description: "Your ticket PDF is being generated.",
     });
   };
 
@@ -219,5 +282,3 @@ export default function ManageBookingPage() {
     </ClientAuthGuard>
   );
 }
-
-    
