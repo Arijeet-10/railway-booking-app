@@ -9,9 +9,18 @@ import { Button } from "@/components/ui/button";
 
 // Mock data for train search results - Indian context
 const MOCK_TRAINS: Train[] = [
-  { id: 'T001', trainName: 'Rajdhani Express', trainNumber: '12301', origin: 'New Delhi', destination: 'Mumbai Central', departureTime: '17:00', arrivalTime: '09:00', duration: '16h 00m', price: 2500, availableClasses: ['economy', 'business'] },
-  { id: 'T002', trainName: 'Shatabdi Express', trainNumber: '12002', origin: 'Chennai Egmore', destination: 'Bengaluru Cantt', departureTime: '06:00', arrivalTime: '11:00', duration: '5h 00m', price: 1200, availableClasses: ['economy', 'business', 'first'] },
-  { id: 'T003', trainName: 'Deccan Queen', trainNumber: '12124', origin: 'Pune Jn', destination: 'Mumbai CST', departureTime: '07:15', arrivalTime: '10:25', duration: '3h 10m', price: 450, availableClasses: ['economy'] },
+  { id: 'T001', trainName: 'Rajdhani Express', trainNumber: '12301', origin: 'New Delhi (NDLS)', destination: 'Mumbai Central (MMCT)', departureTime: '17:00', arrivalTime: '09:00', duration: '16h 00m', price: 2500, availableClasses: ['economy', 'business'] },
+  { id: 'T002', trainName: 'Shatabdi Express', trainNumber: '12002', origin: 'Chennai Egmore (MS)', destination: 'Bengaluru Cantt (BNC)', departureTime: '06:00', arrivalTime: '11:00', duration: '5h 00m', price: 1200, availableClasses: ['economy', 'business', 'first'] },
+  { id: 'T003', trainName: 'Deccan Queen', trainNumber: '12124', origin: 'Pune Jn (PUNE)', destination: 'Chhatrapati Shivaji Maharaj Terminus (CSMT)', departureTime: '07:15', arrivalTime: '10:25', duration: '3h 10m', price: 450, availableClasses: ['economy'] },
+  { id: 'T004', trainName: 'Coromandel Express', trainNumber: '12841', origin: 'Kolkata Howrah Jn (HWH)', destination: 'Chennai Central (MAS)', departureTime: '14:50', arrivalTime: '17:00', duration: '26h 10m', price: 1800, availableClasses: ['economy', 'business'] },
+  { id: 'T005', trainName: 'Kacheguda Express', trainNumber: '12786', origin: 'KSR Bengaluru City Junction (SBC)', destination: 'Hyderabad Deccan Nampally (HYB)', departureTime: '18:20', arrivalTime: '05:40', duration: '11h 20m', price: 950, availableClasses: ['economy', 'business'] },
+  { id: 'T006', trainName: 'Ashram Express', trainNumber: '12915', origin: 'Ahmedabad Jn (ADI)', destination: 'Jaipur Jn (JP)', departureTime: '19:30', arrivalTime: '05:45', duration: '10h 15m', price: 800, availableClasses: ['economy'] },
+  { id: 'T007', trainName: 'Tejas Express', trainNumber: '82501', origin: 'Lucknow Charbagh NR (LKO)', destination: 'New Delhi (NDLS)', departureTime: '06:10', arrivalTime: '12:25', duration: '6h 15m', price: 1500, availableClasses: ['business', 'first'] },
+  { id: 'T008', trainName: 'North East Express', trainNumber: '12506', origin: 'Patna Jn (PNBE)', destination: 'Guwahati (GHY)', departureTime: '07:20', arrivalTime: '22:00', duration: '14h 40m', price: 1100, availableClasses: ['economy', 'business'] },
+  { id: 'T009', trainName: 'Nagpur Pune Superfast', trainNumber: '12136', origin: 'Nagpur Jn (NGP)', destination: 'Pune Jn (PUNE)', departureTime: '18:00', arrivalTime: '09:45', duration: '15h 45m', price: 1050, availableClasses: ['economy'] },
+  { id: 'T010', trainName: 'Marudhar Express', trainNumber: '14854', origin: 'Agra Cantt (AGC)', destination: 'Varanasi Jn (BSB)', departureTime: '21:20', arrivalTime: '10:30', duration: '13h 10m', price: 700, availableClasses: ['economy', 'business'] },
+  { id: 'T011', trainName: 'Amritsar Kalka Express', trainNumber: '14505', origin: 'Amritsar Jn (ASR)', destination: 'Kalka (KLK)', departureTime: '14:15', arrivalTime: '19:00', duration: '4h 45m', price: 350, availableClasses: ['economy'] },
+  { id: 'T012', trainName: 'Jammu Rajdhani', trainNumber: '12426', origin: 'Jammu Tawi (JAT)', destination: 'New Delhi (NDLS)', departureTime: '21:25', arrivalTime: '05:55', duration: '8h 30m', price: 2200, availableClasses: ['business', 'first'] },
 ];
 
 export default function HomePage() {
