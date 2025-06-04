@@ -48,12 +48,12 @@ export interface Booking {
   travelDate: string;  // YYYY-MM-DD
   departureTime: string;
   arrivalTime: string;
-  seats: string[]; // e.g., Passenger names or actual seat numbers if assigned
+  seats: string[]; // Legacy, use passengersList for names for new bookings.
   totalPrice: number;
   status: 'upcoming' | 'completed' | 'cancelled';
   selectedClass: string;
   numPassengers: number;
-  passengersList?: PassengerFormValues[]; // Detailed passenger info
+  passengersList: PassengerFormValues[]; // Detailed passenger info, make it non-optional
 }
 
 export interface SavedPassenger extends PassengerFormValues {
@@ -88,3 +88,4 @@ export interface ChatMessage {
   timestamp: Date;
 }
 
+    

@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { CalendarDays, Clock, MapPin, Ticket, Users, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import Link from 'next/link'; // Import Link
 
 interface BookingCardProps {
   booking: Booking;
@@ -47,7 +47,8 @@ export const BookingCard = ({ booking }: BookingCardProps) => {
         </div>
         <div className="flex items-center">
           <CalendarDays className="mr-2 h-4 w-4 text-muted-foreground" />
-          <span>Travel Date: {new Date(booking.travelDate).toLocaleDateString()}</span>
+          {/* Ensure travelDate is parsed correctly if it's a string */}
+          <span>Travel Date: {new Date(booking.travelDate + "T00:00:00").toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
         </div>
         <div className="flex items-center">
           <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
@@ -55,7 +56,7 @@ export const BookingCard = ({ booking }: BookingCardProps) => {
         </div>
         <div className="flex items-center">
           <Users className="mr-2 h-4 w-4 text-muted-foreground" />
-          <span>Seats: {booking.seats.join(', ')} ({booking.seats.length} passenger{booking.seats.length > 1 ? 's' : ''})</span>
+          <span>Passengers: {booking.passengersList ? booking.passengersList.map(p => p.name).join(', ') : booking.seats.join(', ')} ({booking.numPassengers} passenger{booking.numPassengers > 1 ? 's' : ''})</span>
         </div>
         <div className="flex items-center font-semibold">
           <Ticket className="mr-2 h-4 w-4 text-accent" />
@@ -64,7 +65,9 @@ export const BookingCard = ({ booking }: BookingCardProps) => {
       </CardContent>
       <CardFooter className="mt-auto">
         {booking.status === 'upcoming' && (
-          <Button variant="outline" size="sm" className="w-full">Manage Booking</Button>
+          <Button variant="outline" size="sm" className="w-full" asChild>
+            <Link href={`/bookings/${booking.id}/manage`}>Manage Booking</Link>
+          </Button>
         )}
         {booking.status === 'completed' && (
           <Button variant="ghost" size="sm" className="w-full">Leave a Review</Button>
@@ -76,3 +79,5 @@ export const BookingCard = ({ booking }: BookingCardProps) => {
     </Card>
   );
 };
+
+    
