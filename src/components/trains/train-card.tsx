@@ -1,7 +1,8 @@
+tsx
 import type { Train } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, DollarSign, MapPin, TrainFront as TrainIcon, ArrowRight, Ticket } from 'lucide-react';
+import { Clock, MapPin, TrainFront as TrainIcon, ArrowRight, Ticket } from 'lucide-react';
 import Link from 'next/link';
 
 interface TrainCardProps {
@@ -21,7 +22,7 @@ export const TrainCard = ({ train }: TrainCardProps) => {
             <CardDescription>Train No: {train.trainNumber}</CardDescription>
           </div>
           <div className="text-right">
-            <p className="text-2xl font-semibold text-accent">${train.price.toFixed(2)}</p>
+            <p className="text-2xl font-semibold text-accent">₹{train.price.toFixed(2)}</p>
             <p className="text-xs text-muted-foreground">per person</p>
           </div>
         </div>

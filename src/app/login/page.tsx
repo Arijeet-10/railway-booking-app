@@ -1,3 +1,4 @@
+tsx
 import LoginForm from '@/components/auth/login-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
@@ -8,7 +9,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-headline">Welcome Back!</CardTitle>
-          <CardDescription>Log in to access your RailEase account.</CardDescription>
+          <CardDescription>Log in to access your Indian Rail Connect account.</CardDescription>
         </CardHeader>
         <CardContent>
           <LoginForm />

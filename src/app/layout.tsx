@@ -1,12 +1,13 @@
+tsx
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import { AuthProvider } from '@/hooks/useAuth'; // Will be created
-import AppHeader from '@/app/(components)/header'; // Will be created
+import { AuthProvider } from '@/hooks/useAuth'; 
+import AppHeader from '@/app/(components)/header'; 
 
 export const metadata: Metadata = {
-  title: 'RailEase',
-  description: 'Book your train tickets with ease.',
+  title: 'Indian Rail Connect',
+  description: 'Book your Indian Railways train tickets with ease.',
 };
 
 export default function RootLayout({
@@ -28,7 +29,7 @@ export default function RootLayout({
             {children}
           </main>
           <footer className="bg-muted text-muted-foreground py-6 text-center">
-            <p>&copy; {new Date().getFullYear()} RailEase. All rights reserved.</p>
+            <p>&copy; {new Date().getFullYear()} Indian Rail Connect. All rights reserved.</p>
           </footer>
           <Toaster />
         </AuthProvider>

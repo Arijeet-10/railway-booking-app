@@ -1,4 +1,5 @@
-"use client"; // This page needs client-side interaction for seat selection
+
+"use client"; 
 
 import { useParams, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -71,7 +72,6 @@ const SeatAvailabilityGrid = ({ seats, selectedSeats, onSeatSelect }: { seats: S
                   aria-label={`Seat ${seat.number}, Status: ${isSelected ? 'selected' : seat.status}`}
                 >
                   <Armchair size={20} />
-                  {/* <span className="text-xs">{seat.number}</span> */}
                 </Button>
               );
             })}
@@ -101,12 +101,11 @@ export default function SeatAvailabilityPage() {
   const [isBooking, setIsBooking] = useState(false);
 
   useEffect(() => {
-    // Simulate fetching seats
     setIsLoading(true);
     setTimeout(() => {
-      const mockCoachS1 = generateMockSeats('S1', 10, 6);
-      const mockCoachB1 = generateMockSeats('B1', 5, 4); // Business coach
-      setSeats([...mockCoachS1, ...mockCoachB1]);
+      const mockCoachS1 = generateMockSeats('S1', 12, 6); // Typical sleeper coach
+      const mockCoachC1 = generateMockSeats('C1', 8, 5); // AC Chair car
+      setSeats([...mockCoachS1, ...mockCoachC1]);
       setIsLoading(false);
     }, 1000);
   }, [trainId]);
@@ -122,7 +121,6 @@ export default function SeatAvailabilityPage() {
   const handleBooking = () => {
     if (!user) {
       toast({ title: "Authentication Required", description: "Please log in to book tickets.", variant: "destructive" });
-      // Optionally redirect to login: router.push('/login?redirect=/trains/...');
       return;
     }
     if(selectedSeats.length === 0) {
@@ -131,16 +129,13 @@ export default function SeatAvailabilityPage() {
     }
 
     setIsBooking(true);
-    // Simulate booking process
     setTimeout(() => {
       toast({
         title: "Booking Successful!",
         description: `Booked ${selectedSeats.length} seat(s) for train ${trainId}. Seat IDs: ${selectedSeats.join(', ')}`,
         action: <Button variant="outline" size="sm" asChild><Link href="/bookings">View Bookings</Link></Button>
       });
-      // Reset selected seats and potentially update seat status in mock data
       setSelectedSeats([]);
-      // In a real app, you'd update the backend here
       setIsBooking(false);
     }, 2000);
   };
@@ -149,7 +144,7 @@ export default function SeatAvailabilityPage() {
     return <div className="flex justify-center items-center min-h-[calc(100vh-200px)]"><Loader2 className="h-16 w-16 animate-spin text-primary" /></div>;
   }
 
-  const totalPrice = selectedSeats.length * 50; // Assuming a flat price of $50 per seat for mock
+  const totalPrice = selectedSeats.length * 500; // Assuming a flat price of ₹500 per seat for mock
 
   return (
     <div className="space-y-8">
@@ -176,7 +171,7 @@ export default function SeatAvailabilityPage() {
         <CardFooter className="flex flex-col md:flex-row justify-between items-center gap-4">
           <div>
             <p className="text-lg font-semibold">Selected Seats: {selectedSeats.length}</p>
-            <p className="text-xl font-bold text-accent">Total Price: ${totalPrice.toFixed(2)}</p>
+            <p className="text-xl font-bold text-accent">Total Price: ₹{totalPrice.toFixed(2)}</p>
           </div>
           <Button 
             size="lg" 

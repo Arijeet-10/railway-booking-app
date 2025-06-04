@@ -1,7 +1,8 @@
+ts
 'use server';
 
 /**
- * @fileOverview A smart train route suggestion AI agent.
+ * @fileOverview A smart Indian train route suggestion AI agent.
  *
  * - getSmartTrainSuggestions - A function that generates smart train route suggestions.
  * - SmartTrainSuggestionsInput - The input type for the getSmartTrainSuggestions function.
@@ -13,8 +14,8 @@ import {z} from 'genkit';
 
 const SmartTrainSuggestionsInputSchema = z.object({
   userId: z.string().describe('The ID of the user.'),
-  origin: z.string().describe('The origin station for the journey.'),
-  destination: z.string().describe('The destination station for the journey.'),
+  origin: z.string().describe('The origin station for the journey (e.g., New Delhi).'),
+  destination: z.string().describe('The destination station for the journey (e.g., Mumbai Central).'),
   date: z.string().describe('The date of travel (YYYY-MM-DD).'),
   pastRoutes: z
     .array(
@@ -25,7 +26,7 @@ const SmartTrainSuggestionsInputSchema = z.object({
       })
     )
     .optional()
-    .describe('A list of the users past train routes taken.'),
+    .describe('A list of the users past train routes taken in India.'),
   popularRoutes: z
     .array(
       z.object({
@@ -34,7 +35,7 @@ const SmartTrainSuggestionsInputSchema = z.object({
       })
     )
     .optional()
-    .describe('A list of popular train routes.'),
+    .describe('A list of popular train routes in India (e.g., Delhi-Mumbai, Chennai-Bangalore).'),
 });
 export type SmartTrainSuggestionsInput = z.infer<typeof SmartTrainSuggestionsInputSchema>;
 
@@ -62,11 +63,11 @@ const prompt = ai.definePrompt({
   name: 'smartTrainSuggestionsPrompt',
   input: {schema: SmartTrainSuggestionsInputSchema},
   output: {schema: SmartTrainSuggestionsOutputSchema},
-  prompt: `You are a train travel expert, recommending routes to users based on their history and popular routes.
+  prompt: `You are an Indian train travel expert, recommending routes to users based on their history and popular routes on Indian Railways.
 
   The user is travelling from {{origin}} to {{destination}} on {{date}}.
 
-  Here are the user's past routes:
+  Here are the user's past routes in India:
   {{#if pastRoutes}}
     {{#each pastRoutes}}
       - From {{this.origin}} to {{this.destination}} on {{this.date}}
@@ -75,7 +76,7 @@ const prompt = ai.definePrompt({
     - None
   {{/if}}
 
-  Here are some popular routes:
+  Here are some popular Indian train routes:
   {{#if popularRoutes}}
     {{#each popularRoutes}}
       - From {{this.origin}} to {{this.destination}}
@@ -84,10 +85,10 @@ const prompt = ai.definePrompt({
     - None
   {{/if}}
 
-  Based on this information, suggest the 3 most convenient train routes for the user. Be creative, and consider edge cases not explicitly mentioned.
+  Based on this information, suggest the 3 most convenient train routes for the user within India. Be creative, and consider factors like scenic views, major festivals, or alternative hub connections if applicable.
   Each suggestion should include a reason, if possible.
   The date should be the same as the user's travel date.
-  Do not suggest any routes that start or end at stations that do not exist.
+  Do not suggest any routes that start or end at stations that do not exist in India.
   `,
 });
 

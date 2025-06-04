@@ -1,3 +1,4 @@
+tsx
 import SignupForm from '@/components/auth/signup-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
@@ -8,7 +9,7 @@ export default function SignupPage() {
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="text-center">
           <CardTitle className="text-3xl font-headline">Create Your Account</CardTitle>
-          <CardDescription>Join RailEase to book train tickets effortlessly.</CardDescription>
+          <CardDescription>Join Indian Rail Connect to book train tickets effortlessly.</CardDescription>
         </CardHeader>
         <CardContent>
           <SignupForm />

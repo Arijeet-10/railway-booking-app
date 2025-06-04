@@ -1,3 +1,4 @@
+tsx
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -45,9 +46,9 @@ export default function LoginForm() {
       await signInWithEmailAndPassword(auth, values.email, values.password);
       toast({
         title: "Login Successful",
-        description: "Welcome back to RailEase!",
+        description: "Welcome back to Indian Rail Connect!",
       });
-      router.push("/"); // Redirect to homepage or dashboard
+      router.push("/"); 
     } catch (error: any) {
       console.error("Login error:", error);
       let errorMessage = "An unknown error occurred. Please try again.";

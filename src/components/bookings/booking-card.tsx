@@ -1,3 +1,4 @@
+tsx
 import type { Booking } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,7 +59,7 @@ export const BookingCard = ({ booking }: BookingCardProps) => {
         </div>
         <div className="flex items-center font-semibold">
           <Ticket className="mr-2 h-4 w-4 text-accent" />
-          <span>Total Price: ${booking.totalPrice.toFixed(2)}</span>
+          <span>Total Price: ₹{booking.totalPrice.toFixed(2)}</span>
         </div>
       </CardContent>
       <CardFooter className="mt-auto">

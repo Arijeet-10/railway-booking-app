@@ -1,3 +1,4 @@
+tsx
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,7 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import type { SmartTrainSuggestionsInput, SmartTrainSuggestionsOutput, PastRoute, PopularRoute } from '@/lib/types';
 import { getSmartTrainSuggestions } from '@/ai/flows/smart-train-suggestions';
-import { Alert, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertTitle, AlertDescription as UIAlertDescription } from "@/components/ui/alert"; // Renamed to avoid conflict
 
 const suggestionFormSchema = z.object({
   origin: z.string().min(2, { message: "Origin must be at least 2 characters." }),
@@ -33,15 +34,15 @@ const suggestionFormSchema = z.object({
   date: z.date({ required_error: "A date of travel is required." }),
 });
 
-// Mock data for past and popular routes
+// Mock data for past and popular routes - Indian context
 const MOCK_PAST_ROUTES: PastRoute[] = [
-  { origin: "New York", destination: "Boston", date: "2023-05-10" },
-  { origin: "Chicago", destination: "New York", date: "2023-08-22" },
+  { origin: "New Delhi", destination: "Jaipur", date: "2023-05-10" },
+  { origin: "Mumbai Central", destination: "Pune Jn", date: "2023-08-22" },
 ];
 const MOCK_POPULAR_ROUTES: PopularRoute[] = [
-  { origin: "New York", destination: "Washington D.C." },
-  { origin: "Los Angeles", destination: "San Francisco" },
-  { origin: "Chicago", destination: "Detroit" },
+  { origin: "New Delhi", destination: "Mumbai Central" },
+  { origin: "Chennai Egmore", destination: "Bengaluru Cantt" },
+  { origin: "Howrah Jn", destination: "Patna Jn" },
 ];
 
 export default function SuggestionForm() {
@@ -74,20 +75,20 @@ export default function SuggestionForm() {
       origin: values.origin,
       destination: values.destination,
       date: format(values.date, "yyyy-MM-dd"),
-      pastRoutes: MOCK_PAST_ROUTES, // Using mock data
-      popularRoutes: MOCK_POPULAR_ROUTES, // Using mock data
+      pastRoutes: MOCK_PAST_ROUTES, 
+      popularRoutes: MOCK_POPULAR_ROUTES, 
     };
 
     try {
       const result = await getSmartTrainSuggestions(inputForAI);
       setSuggestions(result);
       if (!result.suggestions || result.suggestions.length === 0) {
-        toast({ title: "No Suggestions", description: "AI couldn't find any specific suggestions for this route." });
+        toast({ title: "No Suggestions", description: "AI couldn't find any specific suggestions for this route on Indian Railways." });
       }
     } catch (e: any) {
       console.error("Error getting smart suggestions:", e);
       setError("Failed to fetch smart suggestions. Please try again.");
-      toast({ title: "Error", description: "Could not fetch suggestions.", variant: "destructive" });
+      toast({ title: "Error", description: "Could not fetch suggestions for Indian Railways.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -109,7 +110,7 @@ export default function SuggestionForm() {
                 <FormItem>
                   <FormLabel className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-muted-foreground" />Origin</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., New York" {...field} />
+                    <Input placeholder="e.g., New Delhi" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -122,7 +123,7 @@ export default function SuggestionForm() {
                 <FormItem>
                   <FormLabel className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-muted-foreground" />Destination</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Washington D.C." {...field} />
+                    <Input placeholder="e.g., Mumbai Central" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -165,7 +166,7 @@ export default function SuggestionForm() {
             )}
           />
           <FormDescription>
-            We use your (mocked) past travel and popular routes to provide tailored suggestions.
+            We use your (mocked) past Indian Railways travel and popular routes to provide tailored suggestions.
           </FormDescription>
           <Button type="submit" className="w-full" disabled={isLoading || !user}>
             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
@@ -178,7 +179,7 @@ export default function SuggestionForm() {
         <Alert variant="destructive" className="mt-6">
           <AlertTriangle className="h-4 w-4" />
           <AlertTitle>Error</AlertTitle>
-          <AlertDescription>{error}</AlertDescription>
+          <UIAlertDescription>{error}</UIAlertDescription>
         </Alert>
       )}
 
@@ -214,9 +215,9 @@ export default function SuggestionForm() {
          <Alert className="mt-6">
             <Sparkles className="h-4 w-4" />
             <AlertTitle>No Specific Suggestions</AlertTitle>
-            <AlertDescription>
-              The AI couldn&apos;t find any specific alternative suggestions for this query. You can try a standard search.
-            </AlertDescription>
+            <UIAlertDescription>
+              The AI couldn&apos;t find any specific alternative suggestions for this query. You can try a standard search on Indian Rail Connect.
+            </UIAlertDescription>
           </Alert>
       )}
     </CardContent>

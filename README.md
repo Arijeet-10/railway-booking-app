@@ -1,6 +1,7 @@
-# RailEase
+md
+# Indian Rail Connect
 
-RailEase is a Next.js application for searching, viewing, and booking train tickets, enhanced with AI-powered smart route suggestions.
+Indian Rail Connect is a Next.js application for searching, viewing, and booking train tickets in India, enhanced with AI-powered smart route suggestions.
 
 ## Getting Started
 
@@ -40,12 +41,12 @@ To get started:
 
 ## Core Features
 
--   **Train Search**: Search for trains based on origin, destination, and date.
+-   **Train Search**: Search for trains based on origin, destination, and date within India.
 -   **Seat Availability**: View available seats for a selected train (mock data).
 -   **User Authentication**: Create user accounts with email verification using Firebase Authentication.
 -   **Booking History**: Display user booking history (mock data).
 -   **Profile Management**: View and edit user profile (display name).
--   **Smart Suggestions**: AI-powered tool for train route recommendations.
+-   **Smart Suggestions**: AI-powered tool for train route recommendations in India.
 
 ## Tech Stack
 
@@ -83,7 +84,7 @@ See `src/lib/firebase/config.ts` for Firebase configuration. It's recommended to
 Additionally, Genkit (Google AI) may require its own environment variables for API keys if you modify or extend the AI flows. Check `src/ai/dev.ts` and `src/ai/genkit.ts`.
 ```
 DOTENV_CONFIG_PATH=../../.env
-GOOGLE_API_KEY=your_google_ai_api_key_here 
+GOOGLE_API_KEY=your_google_ai_api_key_here
 ```
 Place these in an `.env` file inside the `src/ai` directory if needed for local Genkit development, or manage them as appropriate for your deployment. The provided `src/ai/dev.ts` uses `dotenv` which would look for an `.env` file in the project root by default or as specified.
 The `genkit:dev` script in `package.json` points to `src/ai/dev.ts`.
@@ -92,6 +93,7 @@ Ensure your `.env` file is in the root of the project for `dotenv` used by `src/
 ## Further Development
 
 -   Implement actual booking logic (currently mocked).
--   Connect to a real train data API for search and availability.
+-   Connect to a real Indian Railways data API for search and availability.
 -   Store user bookings and profile details in Firestore.
 -   Expand AI suggestions with more personalized data.
+
