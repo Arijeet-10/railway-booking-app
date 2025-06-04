@@ -15,13 +15,13 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent } from "@/components/ui/popover";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CardContent, CardFooter } from "@/components/ui/card"; // Card, CardHeader, CardTitle, CardDescription removed as they are in parent
+import { CardContent, CardFooter } from "@/components/ui/card";
 import { CalendarIcon, MapPin, Loader2, Sparkles, AlertTriangle, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
-import React, { useState, useMemo } from 'react'; // Added React and useMemo
+import React, { useState, useMemo, useRef } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import type { SmartTrainSuggestionsInput, SmartTrainSuggestionsOutput, PastRoute, PopularRoute } from '@/lib/types';
@@ -35,6 +35,7 @@ const suggestionFormSchema = z.object({
   date: z.date({ required_error: "A date of travel is required." }),
 });
 
+// Mock data for demonstration purposes
 const MOCK_PAST_ROUTES: PastRoute[] = [
   { origin: "New Delhi (NDLS)", destination: "Jaipur Jn (JP)", date: "2023-05-10" },
   { origin: "Mumbai Central (MMCT)", destination: "Pune Jn (PUNE)", date: "2023-08-22" },
@@ -69,7 +70,7 @@ export default function SuggestionForm() {
     setIsLoading(true);
     setError(null);
     setSuggestions(null);
-    setShowOriginSuggestions(false);
+    setShowOriginSuggestions(false); // Hide popovers on submit
     setShowDestinationSuggestions(false);
 
     const inputForAI: SmartTrainSuggestionsInput = {
@@ -77,7 +78,7 @@ export default function SuggestionForm() {
       origin: values.origin,
       destination: values.destination,
       date: format(values.date, "yyyy-MM-dd"),
-      pastRoutes: MOCK_PAST_ROUTES,
+      pastRoutes: MOCK_PAST_ROUTES, 
       popularRoutes: MOCK_POPULAR_ROUTES,
     };
 
@@ -99,13 +100,13 @@ export default function SuggestionForm() {
   // State for Origin Autocomplete
   const [originInputValue, setOriginInputValue] = useState(form.getValues("origin") || "");
   const [showOriginSuggestions, setShowOriginSuggestions] = useState(false);
-  const originInputWrapperRef = React.useRef<HTMLDivElement>(null);
+  const originInputWrapperRef = useRef<HTMLDivElement>(null);
 
   const handleOriginInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setOriginInputValue(value);
     form.setValue("origin", value, { shouldValidate: true });
-     if (value) {
+     if (value.trim()) {
       setShowOriginSuggestions(true);
     } else {
       setShowOriginSuggestions(false);
@@ -117,22 +118,22 @@ export default function SuggestionForm() {
     setShowOriginSuggestions(false);
   };
   const filteredOriginStations = useMemo(() => {
-    if (!originInputValue) return [];
+    if (!originInputValue.trim()) return [];
     return indianStations.filter((station) =>
-      station.toLowerCase().includes(originInputValue.toLowerCase())
-    );
+      station.toLowerCase().includes(originInputValue.toLowerCase().trim())
+    ).slice(0, 10);
   }, [originInputValue]);
 
   // State for Destination Autocomplete
   const [destinationInputValue, setDestinationInputValue] = useState(form.getValues("destination") || "");
   const [showDestinationSuggestions, setShowDestinationSuggestions] = useState(false);
-  const destinationInputWrapperRef = React.useRef<HTMLDivElement>(null);
+  const destinationInputWrapperRef = useRef<HTMLDivElement>(null);
 
   const handleDestinationInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setDestinationInputValue(value);
     form.setValue("destination", value, { shouldValidate: true });
-    if (value) {
+    if (value.trim()) {
       setShowDestinationSuggestions(true);
     } else {
       setShowDestinationSuggestions(false);
@@ -144,10 +145,10 @@ export default function SuggestionForm() {
     setShowDestinationSuggestions(false);
   };
   const filteredDestinationStations = useMemo(() => {
-    if (!destinationInputValue) return [];
+    if (!destinationInputValue.trim()) return [];
     return indianStations.filter((station) =>
-      station.toLowerCase().includes(destinationInputValue.toLowerCase())
-    );
+      station.toLowerCase().includes(destinationInputValue.toLowerCase().trim())
+    ).slice(0, 10);
   }, [destinationInputValue]);
 
 
@@ -167,23 +168,27 @@ export default function SuggestionForm() {
                 <FormItem>
                   <FormLabel className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-muted-foreground" />Origin</FormLabel>
                   <Popover open={showOriginSuggestions && filteredOriginStations.length > 0} onOpenChange={setShowOriginSuggestions}>
-                    <div ref={originInputWrapperRef} className="relative">
-                      <FormControl>
-                        <Input
-                          placeholder="e.g., New Delhi"
-                          {...field}
-                          value={originInputValue}
-                          onChange={handleOriginInputChange}
-                          onFocus={() => {
-                             if (originInputValue && filteredOriginStations.length > 0) setShowOriginSuggestions(true);
-                          }}
-                          onBlur={() => setTimeout(() => setShowOriginSuggestions(false), 150)}
-                          autoComplete="off"
-                        />
-                      </FormControl>
-                    </div>
+                    <PopoverTrigger asChild>
+                      <div ref={originInputWrapperRef} className="relative">
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., New Delhi"
+                            value={originInputValue}
+                            onChange={handleOriginInputChange}
+                            onFocus={() => {
+                               if (originInputValue.trim() && filteredOriginStations.length > 0) setShowOriginSuggestions(true);
+                            }}
+                            onBlur={() => setTimeout(() => setShowOriginSuggestions(false), 150)}
+                            autoComplete="off"
+                            aria-autocomplete="list"
+                            aria-controls="origin-suggestions-smart"
+                          />
+                        </FormControl>
+                      </div>
+                    </PopoverTrigger>
                     <PopoverContent
-                      className="p-0 max-h-60 overflow-y-auto"
+                      id="origin-suggestions-smart"
+                      className="p-0 w-full max-h-60 overflow-y-auto"
                       style={{ width: originInputWrapperRef.current?.offsetWidth }}
                       align="start"
                       onOpenAutoFocus={(e) => e.preventDefault()}
@@ -213,23 +218,27 @@ export default function SuggestionForm() {
                 <FormItem>
                   <FormLabel className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-muted-foreground" />Destination</FormLabel>
                   <Popover open={showDestinationSuggestions && filteredDestinationStations.length > 0} onOpenChange={setShowDestinationSuggestions}>
-                    <div ref={destinationInputWrapperRef} className="relative">
-                      <FormControl>
-                        <Input
-                          placeholder="e.g., Mumbai Central"
-                          {...field}
-                          value={destinationInputValue}
-                          onChange={handleDestinationInputChange}
-                          onFocus={() => {
-                            if (destinationInputValue && filteredDestinationStations.length > 0) setShowDestinationSuggestions(true);
-                          }}
-                          onBlur={() => setTimeout(() => setShowDestinationSuggestions(false), 150)}
-                           autoComplete="off"
-                        />
-                      </FormControl>
-                    </div>
+                     <PopoverTrigger asChild>
+                        <div ref={destinationInputWrapperRef} className="relative">
+                          <FormControl>
+                            <Input
+                              placeholder="e.g., Mumbai Central"
+                              value={destinationInputValue}
+                              onChange={handleDestinationInputChange}
+                              onFocus={() => {
+                                if (destinationInputValue.trim() && filteredDestinationStations.length > 0) setShowDestinationSuggestions(true);
+                              }}
+                              onBlur={() => setTimeout(() => setShowDestinationSuggestions(false), 150)}
+                               autoComplete="off"
+                               aria-autocomplete="list"
+                               aria-controls="destination-suggestions-smart"
+                            />
+                          </FormControl>
+                        </div>
+                      </PopoverTrigger>
                     <PopoverContent
-                      className="p-0 max-h-60 overflow-y-auto"
+                      id="destination-suggestions-smart"
+                      className="p-0 w-full max-h-60 overflow-y-auto"
                       style={{ width: destinationInputWrapperRef.current?.offsetWidth }}
                       align="start"
                       onOpenAutoFocus={(e) => e.preventDefault()}
@@ -260,6 +269,20 @@ export default function SuggestionForm() {
               <FormItem className="flex flex-col">
                 <FormLabel className="flex items-center"><CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />Date of Travel</FormLabel>
                 <Popover>
+                   <PopoverTrigger asChild>
+                      <FormControl>
+                         <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                          </Button>
+                      </FormControl>
+                    </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
                     <Calendar
                       mode="single"
@@ -269,18 +292,6 @@ export default function SuggestionForm() {
                       initialFocus
                     />
                   </PopoverContent>
-                  <FormControl>
-                     <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !field.value && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                      </Button>
-                  </FormControl>
                 </Popover>
                 <FormMessage />
               </FormItem>
@@ -289,9 +300,9 @@ export default function SuggestionForm() {
           <FormDescription>
             We use your (mocked) past Indian Railways travel and popular routes to provide tailored suggestions.
           </FormDescription>
-          <Button type="submit" className="w-full" disabled={isLoading || !user}>
+          <Button type="submit" className="w-full" disabled={isLoading || authLoading || !user}>
             {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-            {user ? 'Get Smart Suggestions' : 'Login to Get Suggestions'}
+            {user ? (isLoading ? 'Getting Suggestions...' : 'Get Smart Suggestions') : 'Login to Get Suggestions'}
           </Button>
         </form>
       </Form>
@@ -319,11 +330,11 @@ export default function SuggestionForm() {
                 </p>
               </div>
               {suggestion.reason && (
-                <div className="px-4 pb-2">
+                <div className="px-4 pb-3 pt-1"> {/* Adjusted padding */}
                   <p className="text-sm text-muted-foreground italic">"{suggestion.reason}"</p>
                 </div>
               )}
-              <CardFooter className="p-4 border-t">
+              <CardFooter className="p-4 border-t bg-muted/30 rounded-b-lg"> {/* Added bg for footer */}
                 <Button variant="outline" asChild className="w-full">
                   <a href={`/?origin=${encodeURIComponent(suggestion.origin)}&destination=${encodeURIComponent(suggestion.destination)}&date=${suggestion.date}`}>Search this route</a>
                 </Button>

@@ -14,12 +14,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent } from "@/components/ui/popover";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, MapPin, Search, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { indianStations } from '@/lib/indian-stations';
 
@@ -46,17 +46,19 @@ export default function TrainSearchForm() {
 
   function onSubmit(values: z.infer<typeof formSchema>) {
     setIsLoading(true);
+    // Hide suggestion popovers on submit
+    setShowOriginSuggestions(false);
+    setShowDestinationSuggestions(false);
+    // In a real app, you would navigate to a search results page or fetch data
+    // For now, we'll just log and show a toast
     console.log("Search values:", {
       ...values,
       date: format(values.date, "PPP"),
     });
-    // Hide suggestion popovers on submit
-    setShowOriginSuggestions(false);
-    setShowDestinationSuggestions(false);
     setTimeout(() => {
       toast({
-        title: "Search Submitted",
-        description: `Searching trains from ${values.origin} to ${values.destination} on ${format(values.date, "PPP")}. (Mock search)`,
+        title: "Search Submitted (Mock)",
+        description: `Searching trains from ${values.origin} to ${values.destination} on ${format(values.date, "PPP")}.`,
       });
       setIsLoading(false);
     }, 1500);
@@ -65,13 +67,13 @@ export default function TrainSearchForm() {
   // State for Origin Autocomplete
   const [originInputValue, setOriginInputValue] = useState(form.getValues("origin") || "");
   const [showOriginSuggestions, setShowOriginSuggestions] = useState(false);
-  const originInputWrapperRef = React.useRef<HTMLDivElement>(null);
+  const originInputWrapperRef = useRef<HTMLDivElement>(null);
 
   const handleOriginInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setOriginInputValue(value);
     form.setValue("origin", value, { shouldValidate: true });
-    if (value) {
+    if (value.trim()) {
       setShowOriginSuggestions(true);
     } else {
       setShowOriginSuggestions(false);
@@ -83,22 +85,22 @@ export default function TrainSearchForm() {
     setShowOriginSuggestions(false);
   };
   const filteredOriginStations = useMemo(() => {
-    if (!originInputValue) return [];
+    if (!originInputValue.trim()) return [];
     return indianStations.filter((station) =>
-      station.toLowerCase().includes(originInputValue.toLowerCase())
-    );
+      station.toLowerCase().includes(originInputValue.toLowerCase().trim())
+    ).slice(0, 10); // Limit to 10 suggestions
   }, [originInputValue]);
 
   // State for Destination Autocomplete
   const [destinationInputValue, setDestinationInputValue] = useState(form.getValues("destination") || "");
   const [showDestinationSuggestions, setShowDestinationSuggestions] = useState(false);
-  const destinationInputWrapperRef = React.useRef<HTMLDivElement>(null);
+  const destinationInputWrapperRef = useRef<HTMLDivElement>(null);
 
   const handleDestinationInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
     setDestinationInputValue(value);
     form.setValue("destination", value, { shouldValidate: true });
-    if (value) {
+    if (value.trim()) {
       setShowDestinationSuggestions(true);
     } else {
       setShowDestinationSuggestions(false);
@@ -110,50 +112,54 @@ export default function TrainSearchForm() {
     setShowDestinationSuggestions(false);
   };
   const filteredDestinationStations = useMemo(() => {
-    if (!destinationInputValue) return [];
+    if (!destinationInputValue.trim()) return [];
     return indianStations.filter((station) =>
-      station.toLowerCase().includes(destinationInputValue.toLowerCase())
-    );
+      station.toLowerCase().includes(destinationInputValue.toLowerCase().trim())
+    ).slice(0, 10); // Limit to 10 suggestions
   }, [destinationInputValue]);
 
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
         <FormField
           control={form.control}
           name="origin"
-          render={({ field }) => (
+          render={({ field }) => ( // field is not directly used for Input value/onChange to allow local state for autocomplete
             <FormItem>
               <FormLabel className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-muted-foreground" />Origin</FormLabel>
               <Popover open={showOriginSuggestions && filteredOriginStations.length > 0} onOpenChange={setShowOriginSuggestions}>
-                <div ref={originInputWrapperRef} className="relative">
-                  <FormControl>
-                    <Input
-                      placeholder="e.g., New Delhi"
-                      {...field}
-                      value={originInputValue}
-                      onChange={handleOriginInputChange}
-                      onFocus={() => {
-                        if (originInputValue && filteredOriginStations.length > 0) setShowOriginSuggestions(true);
-                      }}
-                      onBlur={() => setTimeout(() => setShowOriginSuggestions(false), 150)}
-                      className="bg-background"
-                      autoComplete="off"
-                    />
-                  </FormControl>
-                </div>
+                <PopoverTrigger asChild>
+                  <div ref={originInputWrapperRef} className="relative">
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., New Delhi"
+                        value={originInputValue}
+                        onChange={handleOriginInputChange}
+                        onFocus={() => {
+                          if (originInputValue.trim() && filteredOriginStations.length > 0) setShowOriginSuggestions(true);
+                        }}
+                        onBlur={() => setTimeout(() => setShowOriginSuggestions(false), 150)} // Delay to allow click on suggestion
+                        className="bg-background"
+                        autoComplete="off"
+                        aria-autocomplete="list"
+                        aria-controls="origin-suggestions"
+                      />
+                    </FormControl>
+                  </div>
+                </PopoverTrigger>
                 <PopoverContent
-                  className="p-0 max-h-60 overflow-y-auto"
+                  id="origin-suggestions"
+                  className="p-0 w-full max-h-60 overflow-y-auto"
                   style={{ width: originInputWrapperRef.current?.offsetWidth }}
                   align="start"
-                  onOpenAutoFocus={(e) => e.preventDefault()}
+                  onOpenAutoFocus={(e) => e.preventDefault()} // Prevent focus stealing
                 >
                   {filteredOriginStations.map((station) => (
                     <div
                       key={station}
                       className="p-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer rounded-md"
-                      onMouseDown={(e) => {
+                      onMouseDown={(e) => { // Use onMouseDown to prevent blur before click
                         e.preventDefault();
                         handleOriginSelectSuggestion(station);
                       }}
@@ -174,24 +180,28 @@ export default function TrainSearchForm() {
             <FormItem>
               <FormLabel className="flex items-center"><MapPin className="mr-2 h-4 w-4 text-muted-foreground" />Destination</FormLabel>
                <Popover open={showDestinationSuggestions && filteredDestinationStations.length > 0} onOpenChange={setShowDestinationSuggestions}>
-                <div ref={destinationInputWrapperRef} className="relative">
-                  <FormControl>
-                    <Input
-                      placeholder="e.g., Mumbai Central"
-                      {...field}
-                      value={destinationInputValue}
-                      onChange={handleDestinationInputChange}
-                      onFocus={() => {
-                         if (destinationInputValue && filteredDestinationStations.length > 0) setShowDestinationSuggestions(true);
-                      }}
-                      onBlur={() => setTimeout(() => setShowDestinationSuggestions(false), 150)}
-                      className="bg-background"
-                      autoComplete="off"
-                    />
-                  </FormControl>
-                </div>
+                <PopoverTrigger asChild>
+                  <div ref={destinationInputWrapperRef} className="relative">
+                    <FormControl>
+                      <Input
+                        placeholder="e.g., Mumbai Central"
+                        value={destinationInputValue}
+                        onChange={handleDestinationInputChange}
+                        onFocus={() => {
+                           if (destinationInputValue.trim() && filteredDestinationStations.length > 0) setShowDestinationSuggestions(true);
+                        }}
+                        onBlur={() => setTimeout(() => setShowDestinationSuggestions(false), 150)}
+                        className="bg-background"
+                        autoComplete="off"
+                        aria-autocomplete="list"
+                        aria-controls="destination-suggestions"
+                      />
+                    </FormControl>
+                  </div>
+                </PopoverTrigger>
                 <PopoverContent
-                  className="p-0 max-h-60 overflow-y-auto"
+                  id="destination-suggestions"
+                  className="p-0 w-full max-h-60 overflow-y-auto"
                   style={{ width: destinationInputWrapperRef.current?.offsetWidth }}
                   align="start"
                   onOpenAutoFocus={(e) => e.preventDefault()}
@@ -221,41 +231,37 @@ export default function TrainSearchForm() {
             <FormItem className="flex flex-col">
               <FormLabel className="flex items-center"><CalendarIcon className="mr-2 h-4 w-4 text-muted-foreground" />Date of Travel</FormLabel>
               <Popover>
+                <PopoverTrigger asChild>
+                  <FormControl>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-full justify-start text-left font-normal bg-background",
+                        !field.value && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                    </Button>
+                  </FormControl>
+                </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
                     selected={field.value}
                     onSelect={(date) => {
                         if (date) field.onChange(date);
-                        // Manually close popover if needed, though ShadCN Calendar might handle this
                     }}
-                    disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))}
+                    disabled={(date) => date < new Date(new Date().setHours(0,0,0,0))} // Disable past dates
                     initialFocus
                   />
                 </PopoverContent>
-                <FormControl>
-                  <Button
-                    variant={"outline"}
-                     onClick={(e) => {
-                      // Toggle date picker popover
-                      // This requires managing Popover open state for date picker too
-                      // For simplicity, default Radix behavior is fine.
-                    }}
-                    className={cn(
-                      "w-full justify-start text-left font-normal bg-background",
-                      !field.value && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </FormControl>
               </Popover>
               <FormMessage />
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full lg:col-span-1 py-3 h-auto self-end" disabled={isLoading}>
+        <Button type="submit" className="w-full h-10" disabled={isLoading}> {/* Adjusted self-end to items-end on parent grid and set height */}
           {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
           Search Trains
         </Button>
