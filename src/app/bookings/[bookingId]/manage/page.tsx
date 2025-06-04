@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Loader2, AlertTriangle, Ticket, CalendarDays, Users, MapPin, Trash2, Download, Edit3, ArrowLeft } from 'lucide-react';
+import { Loader2, AlertTriangle, Ticket, CalendarDays, Users, MapPin, Trash2, Download, Edit3, ArrowLeft, DollarSign, Info } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
@@ -30,7 +30,6 @@ export default function ManageBookingPage() {
   useEffect(() => {
     if (authLoading || !user || !bookingId) {
       if (!authLoading && !user) {
-        // Redirect or show message if not logged in, handled by ClientAuthGuard
         setIsLoading(false);
       }
       return;
@@ -45,13 +44,12 @@ export default function ManageBookingPage() {
 
         if (docSnap.exists()) {
           const bookingData = { id: docSnap.id, ...docSnap.data() } as Booking;
-          // Basic check to ensure the logged-in user owns this booking
           if (bookingData.userId === user.uid) {
             setBooking(bookingData);
           } else {
             setError("You do not have permission to view this booking.");
             toast({ title: "Access Denied", description: "You are not authorized to manage this booking.", variant: "destructive" });
-            router.push('/bookings'); // Redirect if not owner
+            router.push('/bookings');
           }
         } else {
           setError("Booking not found.");
@@ -71,7 +69,6 @@ export default function ManageBookingPage() {
   }, [bookingId, user, authLoading, router, toast]);
 
   const handleCancelBooking = () => {
-    // Placeholder for cancellation logic
     toast({
       title: "Cancel Booking (Not Implemented)",
       description: "This feature will be available soon.",
@@ -79,7 +76,6 @@ export default function ManageBookingPage() {
   };
 
   const handleModifyPassengers = () => {
-    // Placeholder
     toast({
         title: "Modify Passengers (Not Implemented)",
         description: "This feature will be available soon.",
@@ -93,63 +89,124 @@ export default function ManageBookingPage() {
     }
 
     const doc = new jsPDF();
-    let yPos = 20; // Initial Y position for text
+    let yPos = 20;
+    const lineSpacing = 7;
+    const sectionSpacing = 12;
+    const leftMargin = 20;
+    const contentStartMargin = 50;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const rightMargin = pageWidth - 20;
 
-    doc.setFontSize(18);
-    doc.text("RailEase - Train Ticket", 105, yPos, { align: "center" });
-    yPos += 10;
+    // Main Title
+    doc.setFontSize(20);
+    doc.setFont(undefined, 'bold');
+    doc.text("Indian Rail Connect - eTicket", pageWidth / 2, yPos, { align: "center" });
+    doc.setFont(undefined, 'normal');
+    yPos += sectionSpacing;
 
-    doc.setFontSize(12);
-    doc.text(`Booking ID: ${booking.id}`, 20, yPos);
-    yPos += 7;
-    doc.text(`Booked on: ${new Date(booking.bookingDate).toLocaleString()}`, 20, yPos);
-    yPos += 10;
-
-    doc.setFontSize(14);
-    doc.text(`${booking.trainName} (${booking.trainNumber})`, 20, yPos);
-    yPos += 7;
-    doc.setFontSize(12);
-    doc.text(`Route: ${booking.origin} to ${booking.destination}`, 20, yPos);
-    yPos += 7;
-    doc.text(`Travel Date: ${new Date(booking.travelDate + "T00:00:00").toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`, 20, yPos);
-    yPos += 7;
-    doc.text(`Departure: ${booking.departureTime} - Arrival: ${booking.arrivalTime}`, 20, yPos);
-    yPos += 7;
-    doc.text(`Class: ${booking.selectedClass.toUpperCase()}`, 20, yPos);
-    yPos += 10;
-
-    doc.setFontSize(14);
-    doc.text("Passenger Details:", 20, yPos);
-    yPos += 7;
+    // Booking Info
     doc.setFontSize(10);
+    doc.text(`Booking ID: ${booking.id}`, leftMargin, yPos);
+    doc.text(`Booked On: ${new Date(booking.bookingDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} ${new Date(booking.bookingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`, rightMargin, yPos, {align: 'right'});
+    yPos += sectionSpacing;
+    
+    doc.setLineWidth(0.2);
+    doc.line(leftMargin, yPos - (sectionSpacing / 2), rightMargin, yPos - (sectionSpacing / 2));
+
+
+    // Journey Details Section
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text("Journey Details", leftMargin, yPos);
+    doc.setFont(undefined, 'normal');
+    yPos += lineSpacing + 2;
+
+    const journeyDetails = [
+        { label: "Train:", value: `${booking.trainName} (${booking.trainNumber})` },
+        { label: "From:", value: booking.origin },
+        { label: "To:", value: booking.destination },
+        { label: "Date:", value: new Date(booking.travelDate + "T00:00:00").toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) },
+        { label: "Departure:", value: booking.departureTime },
+        { label: "Arrival:", value: booking.arrivalTime },
+        { label: "Class:", value: booking.selectedClass.toUpperCase() },
+    ];
+
+    doc.setFontSize(11);
+    journeyDetails.forEach(detail => {
+        doc.setFont(undefined, 'bold');
+        doc.text(detail.label, leftMargin, yPos);
+        doc.setFont(undefined, 'normal');
+        doc.text(detail.value, contentStartMargin, yPos);
+        yPos += lineSpacing;
+    });
+    yPos += sectionSpacing - lineSpacing;
+    doc.line(leftMargin, yPos - (sectionSpacing / 2), rightMargin, yPos - (sectionSpacing / 2));
+
+    // Passenger Details Section
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text("Passenger Details", leftMargin, yPos);
+    doc.setFont(undefined, 'normal');
+    yPos += lineSpacing + 2;
+
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'bold');
+    doc.text("S.No.", leftMargin, yPos);
+    doc.text("Name", leftMargin + 15, yPos);
+    doc.text("Age", leftMargin + 80, yPos);
+    doc.text("Gender", leftMargin + 95, yPos);
+    doc.text("Berth Pref.", leftMargin + 120, yPos);
+    doc.setFont(undefined, 'normal');
+    yPos += lineSpacing;
+
     if (booking.passengersList && booking.passengersList.length > 0) {
       booking.passengersList.forEach((p, index) => {
-        doc.text(`${index + 1}. ${p.name} (Age: ${p.age}, Gender: ${p.gender}, Berth: ${p.preferredBerth.replace(/_/g, ' ')})`, 25, yPos);
-        yPos += 6;
-        if (yPos > 270) { // Page break if content is too long
-          doc.addPage();
-          yPos = 20;
-        }
+        if (yPos > 270) { doc.addPage(); yPos = 20; } // Page break
+        doc.text(`${index + 1}.`, leftMargin, yPos);
+        doc.text(p.name, leftMargin + 15, yPos);
+        doc.text(String(p.age), leftMargin + 80, yPos);
+        doc.text(p.gender.charAt(0).toUpperCase() + p.gender.slice(1), leftMargin + 95, yPos);
+        doc.text(p.preferredBerth.replace(/_/g, ' ').split(' ').map(w=>w.charAt(0).toUpperCase() + w.slice(1)).join(' '), leftMargin + 120, yPos);
+        yPos += lineSpacing;
       });
-    } else {
-      doc.text("No passenger details available (using legacy seat names).", 25, yPos);
-      yPos += 6;
-      booking.seats.forEach((seat, index) => {
-         doc.text(`${index + 1}. Seat: ${seat}`, 25, yPos);
-         yPos +=6;
-         if (yPos > 270) { doc.addPage(); yPos = 20; }
-      });
+    } else { // Fallback for older bookings without passengersList
+        if (yPos > 270) { doc.addPage(); yPos = 20; }
+        doc.text("Passenger details not itemized (legacy booking).", leftMargin + 15, yPos);
+        yPos += lineSpacing;
+        booking.seats.forEach((seat, index) => {
+            if (yPos > 270) { doc.addPage(); yPos = 20; }
+             doc.text(`${index + 1}.`, leftMargin, yPos);
+             doc.text(`Seat: ${seat}`, leftMargin + 15, yPos);
+             yPos += lineSpacing;
+        });
     }
-    yPos += 10;
+    yPos += sectionSpacing - lineSpacing;
+    doc.line(leftMargin, yPos - (sectionSpacing / 2), rightMargin, yPos - (sectionSpacing / 2));
 
+    // Fare Details
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text("Fare Details", leftMargin, yPos);
+    doc.setFont(undefined, 'normal');
+    yPos += lineSpacing + 2;
+    
     doc.setFontSize(12);
-    doc.text(`Total Price: INR ${booking.totalPrice.toFixed(2)}`, 20, yPos);
-    yPos += 15;
+    doc.setFont(undefined, 'bold');
+    doc.text("Total Price:", leftMargin, yPos);
+    doc.setFont(undefined, 'normal');
+    doc.text(`INR ${booking.totalPrice.toFixed(2)}`, contentStartMargin, yPos);
+    yPos += sectionSpacing + 5;
 
+
+    // Footer
     doc.setFontSize(10);
-    doc.text("Thank you for choosing RailEase! Happy Journey!", 105, yPos, { align: "center" });
+    doc.text("Thank you for choosing Indian Rail Connect! Happy Journey!", pageWidth / 2, yPos, { align: "center" });
+    yPos += lineSpacing;
+    doc.setFontSize(8);
+    doc.text("This is a computer-generated ticket and does not require a signature.", pageWidth / 2, yPos, { align: "center" });
 
-    doc.save(`RailEase-Ticket-${booking.id}.pdf`);
+
+    doc.save(`IndianRailConnect-Ticket-${booking.id}.pdf`);
     toast({
         title: "Ticket Downloading",
         description: "Your ticket PDF is being generated.",
@@ -180,8 +237,15 @@ export default function ManageBookingPage() {
   }
 
   if (!booking) {
-    // Should be covered by error states, but as a fallback
-    return <div className="text-center py-10">Booking details could not be loaded.</div>;
+    return (
+        <div className="flex flex-col justify-center items-center min-h-[calc(100vh-200px)]">
+            <Info className="h-16 w-16 text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">Booking details could not be loaded.</p>
+            <Button variant="link" onClick={() => router.push('/bookings')} className="mt-2">
+                Return to My Bookings
+            </Button>
+        </div>
+    );
   }
 
   return (
@@ -228,7 +292,7 @@ export default function ManageBookingPage() {
                     <p className="font-medium">{booking.selectedClass.toUpperCase()}</p>
                 </div>
                 <div>
-                    <p className="text-sm text-muted-foreground">Total Price</p>
+                    <p className="text-sm text-muted-foreground flex items-center"><DollarSign className="mr-1 h-4 w-4 text-green-600" />Total Price</p>
                     <p className="font-medium text-green-600">₹{booking.totalPrice.toFixed(2)}</p>
                 </div>
             </div>
@@ -240,7 +304,7 @@ export default function ManageBookingPage() {
                 {booking.passengersList && booking.passengersList.length > 0 ? (
                     <ul className="list-disc list-inside pl-4 space-y-1 text-sm">
                         {booking.passengersList.map((p, index) => (
-                            <li key={index}>{p.name} (Age: {p.age}, Gender: {p.gender}, Berth: {p.preferredBerth.replace(/_/g, ' ')})</li>
+                            <li key={index}>{p.name} (Age: {p.age}, Gender: {p.gender.charAt(0).toUpperCase() + p.gender.slice(1)}, Berth: {p.preferredBerth.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')})</li>
                         ))}
                     </ul>
                 ) : (
@@ -252,7 +316,7 @@ export default function ManageBookingPage() {
                 )}
             </div>
              <Separator />
-             <p className="text-xs text-muted-foreground">Booked on: {new Date(booking.bookingDate).toLocaleString()}</p>
+             <p className="text-xs text-muted-foreground">Booked on: {new Date(booking.bookingDate).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
           </CardContent>
           {booking.status === 'upcoming' && (
             <CardFooter className="bg-muted/30 p-6 border-t flex flex-col sm:flex-row gap-3 justify-end">
@@ -282,3 +346,5 @@ export default function ManageBookingPage() {
     </ClientAuthGuard>
   );
 }
+
+    
