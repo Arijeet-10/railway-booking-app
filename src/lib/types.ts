@@ -56,6 +56,10 @@ export interface Booking {
   passengersList?: PassengerFormValues[]; // Detailed passenger info
 }
 
+export interface SavedPassenger extends PassengerFormValues {
+  id: string; // A unique ID for the saved passenger
+}
+
 export interface SmartSuggestionInputParams {
     origin: string;
     destination: string;
@@ -83,3 +87,4 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
 }
+

@@ -1,21 +1,29 @@
 
 "use client";
 
-import { useSearchParams, useRouter } from 'next/navigation'; // Added useRouter
+import { useSearchParams, useRouter } from 'next/navigation';
 import ClientAuthGuard from '@/components/ClientAuthGuard';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Train, CalendarDays, UserCircle, Users, Trash2, CreditCard, XCircle } from 'lucide-react';
+import { Train, CalendarDays, UserCircle, Users, Trash2, CreditCard, XCircle, Contact } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import PassengerForm, { type PassengerFormValues } from '@/components/bookings/passenger-form';
-import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
+import type { SavedPassenger } from '@/lib/types';
+
+// Mock data for Saved Passengers - This would ideally come from Firestore
+const MOCK_SAVED_PASSENGERS: SavedPassenger[] = [
+  { id: 'saved1', name: 'Aditya Sharma', age: 30, gender: 'male', preferredBerth: 'lower' },
+  { id: 'saved2', name: 'Priya Singh', age: 28, gender: 'female', preferredBerth: 'side_lower' },
+  { id: 'saved3', name: 'Rohan Verma', age: 8, gender: 'male', preferredBerth: 'no_preference' },
+];
 
 export default function PassengerDetailsPage() {
   const searchParams = useSearchParams();
-  const router = useRouter(); // Initialized useRouter
+  const router = useRouter();
   const { toast } = useToast();
 
   const trainId = searchParams.get('trainId');
@@ -25,9 +33,11 @@ export default function PassengerDetailsPage() {
   const destination = searchParams.get('destination');
 
   const [passengers, setPassengers] = useState<PassengerFormValues[]>([]);
+  const [passengerToPreFill, setPassengerToPreFill] = useState<Partial<PassengerFormValues> | null>(null);
 
   const handleAddPassenger = (passenger: PassengerFormValues) => {
     setPassengers(prevPassengers => [...prevPassengers, passenger]);
+    setPassengerToPreFill(null); // Clear pre-fill after adding
   };
 
   const handleRemovePassenger = (indexToRemove: number) => {
@@ -39,6 +49,19 @@ export default function PassengerDetailsPage() {
     })
   };
 
+  const handleSelectSavedPassenger = (savedPassenger: SavedPassenger) => {
+    setPassengerToPreFill({
+        name: savedPassenger.name,
+        age: savedPassenger.age,
+        gender: savedPassenger.gender,
+        preferredBerth: savedPassenger.preferredBerth,
+    });
+    toast({
+        title: "Passenger Details Loaded",
+        description: `${savedPassenger.name}'s details are ready to be added.`,
+    });
+  };
+
   const handleProceedToPayment = () => {
     if (passengers.length === 0) {
         toast({
@@ -48,12 +71,7 @@ export default function PassengerDetailsPage() {
         });
         return;
     }
-    // In a real app, this would navigate to a payment gateway or summary page
-    // and pass necessary data (e.g., via state management or secure API call)
-    console.log("Proceeding to payment with passengers:", passengers);
-    console.log("Booking details:", { trainId, date, selectedClass, origin, destination });
     
-    // Navigate to payment page with passenger count and booking details
     const queryParams = new URLSearchParams({
         trainId: trainId || '',
         date: date || '',
@@ -62,10 +80,7 @@ export default function PassengerDetailsPage() {
         destination: destination || '',
         numPassengers: String(passengers.length),
     });
-    // For simplicity, we're logging passengers here. In a real app, this state would be managed
-    // more robustly, e.g., in context or a temporary store before hitting a backend.
     localStorage.setItem('pendingBookingPassengers', JSON.stringify(passengers));
-
     router.push(`/payment?${queryParams.toString()}`);
   };
 
@@ -82,7 +97,6 @@ export default function PassengerDetailsPage() {
                 </Link>
             </Button>
         </div>
-
 
         {trainId && date && selectedClass ? (
           <Alert className="shadow-sm border-primary/50 bg-primary/5">
@@ -104,7 +118,43 @@ export default function PassengerDetailsPage() {
           </Alert>
         )}
 
-        {selectedClass && <PassengerForm selectedClass={selectedClass.toUpperCase()} onAddPassenger={handleAddPassenger} />}
+        <section className="mt-8 space-y-4">
+            <h2 className="text-2xl font-semibold flex items-center">
+                 <Contact className="mr-3 h-6 w-6 text-primary" /> Quick Add from Saved Passengers
+            </h2>
+            {MOCK_SAVED_PASSENGERS.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {MOCK_SAVED_PASSENGERS.map(p => (
+                        <Card 
+                            key={p.id} 
+                            className="cursor-pointer hover:shadow-lg hover:border-primary transition-all"
+                            onClick={() => handleSelectSavedPassenger(p)}
+                        >
+                            <CardHeader>
+                                <CardTitle className="text-lg">{p.name}</CardTitle>
+                                <CardDescription>Age: {p.age}, Gender: {p.gender.charAt(0).toUpperCase() + p.gender.slice(1)}</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-xs text-muted-foreground">Berth: {p.preferredBerth.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</p>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            ) : (
+                <Alert>
+                    <AlertTitle>No Saved Passengers</AlertTitle>
+                    <AlertDescription>You don't have any saved passengers yet. You can add them from your profile page.</AlertDescription>
+                </Alert>
+            )}
+             <Separator className="my-6" />
+        </section>
+
+
+        {selectedClass && <PassengerForm 
+            selectedClass={selectedClass.toUpperCase()} 
+            onAddPassenger={handleAddPassenger}
+            initialData={passengerToPreFill}
+        />}
         
         {passengers.length > 0 && (
           <section className="mt-8 space-y-6">
@@ -155,7 +205,7 @@ export default function PassengerDetailsPage() {
                 <UserCircle className="h-5 w-5 text-blue-600" />
                 <AlertTitle className="text-blue-700">No Passengers Added Yet</AlertTitle>
                 <AlertDescription>
-                Please fill out the form above to add passengers to your booking.
+                Please fill out the form above to add passengers to your booking, or select a saved passenger.
                 </AlertDescription>
             </Alert>
         )}

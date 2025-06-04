@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Loader2, UserPlus } from "lucide-react";
 
 const passengerFormSchema = z.object({
@@ -39,9 +39,10 @@ export type PassengerFormValues = z.infer<typeof passengerFormSchema>;
 interface PassengerFormProps {
   selectedClass: string;
   onAddPassenger: (passenger: PassengerFormValues) => void;
+  initialData?: Partial<PassengerFormValues> | null;
 }
 
-export default function PassengerForm({ selectedClass, onAddPassenger }: PassengerFormProps) {
+export default function PassengerForm({ selectedClass, onAddPassenger, initialData }: PassengerFormProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -52,8 +53,25 @@ export default function PassengerForm({ selectedClass, onAddPassenger }: Passeng
       age: undefined,
       gender: undefined,
       preferredBerth: "no_preference",
+      ...initialData,
     },
   });
+
+  useEffect(() => {
+    if (initialData) {
+      form.reset(initialData);
+    } else {
+      // Optionally reset to truly empty if initialData becomes null/undefined after being set
+      // For now, this handles initial load or direct prop change to null.
+      form.reset({
+        name: "",
+        age: undefined,
+        gender: undefined,
+        preferredBerth: "no_preference",
+      });
+    }
+  }, [initialData, form]);
+
 
   async function onSubmit(values: PassengerFormValues) {
     setIsLoading(true);
@@ -66,7 +84,7 @@ export default function PassengerForm({ selectedClass, onAddPassenger }: Passeng
       title: "Passenger Added",
       description: `${values.name} has been added to the list.`,
     });
-    form.reset({ // Reset form for next passenger, keeping selectedClass
+    form.reset({ 
         name: "",
         age: undefined,
         gender: undefined,
