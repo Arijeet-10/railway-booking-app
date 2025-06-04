@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation'; // Added useRouter
 import ClientAuthGuard from '@/components/ClientAuthGuard';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Train, CalendarDays, UserCircle, Users, Trash2, CreditCard, XCircle } from 'lucide-react';
@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 
 export default function PassengerDetailsPage() {
   const searchParams = useSearchParams();
+  const router = useRouter(); // Initialized useRouter
   const { toast } = useToast();
 
   const trainId = searchParams.get('trainId');
@@ -39,14 +40,33 @@ export default function PassengerDetailsPage() {
   };
 
   const handleProceedToPayment = () => {
+    if (passengers.length === 0) {
+        toast({
+            title: "No Passengers",
+            description: "Please add at least one passenger before proceeding.",
+            variant: "destructive",
+        });
+        return;
+    }
     // In a real app, this would navigate to a payment gateway or summary page
+    // and pass necessary data (e.g., via state management or secure API call)
     console.log("Proceeding to payment with passengers:", passengers);
     console.log("Booking details:", { trainId, date, selectedClass, origin, destination });
-    toast({
-        title: "Proceeding to Payment (Simulated)",
-        description: `Collected ${passengers.length} passenger(s) details.`,
+    
+    // Navigate to payment page with passenger count and booking details
+    const queryParams = new URLSearchParams({
+        trainId: trainId || '',
+        date: date || '',
+        class: selectedClass || '',
+        origin: origin || '',
+        destination: destination || '',
+        numPassengers: String(passengers.length),
     });
-     // Potentially redirect or show a modal
+    // For simplicity, we're logging passengers here. In a real app, this state would be managed
+    // more robustly, e.g., in context or a temporary store before hitting a backend.
+    localStorage.setItem('pendingBookingPassengers', JSON.stringify(passengers));
+
+    router.push(`/payment?${queryParams.toString()}`);
   };
 
   return (
@@ -57,7 +77,7 @@ export default function PassengerDetailsPage() {
                 Passenger Details 
             </h1>
             <Button variant="outline" size="sm" asChild>
-                <Link href={trainId && date ? `/trains/${trainId}/seats?date=${date}&origin=${origin}&destination=${destination}` : '/'}>
+                <Link href={trainId && date ? `/trains/${trainId}/seats?date=${date}&origin=${encodeURIComponent(origin || '')}&destination=${encodeURIComponent(destination || '')}` : '/'}>
                     Back to Seat Availability
                 </Link>
             </Button>
@@ -76,6 +96,7 @@ export default function PassengerDetailsPage() {
           </Alert>
         ) : (
           <Alert variant="destructive">
+            <XCircle className="h-5 w-5" />
             <AlertTitle>Missing Booking Information</AlertTitle>
             <AlertDescription>
               Critical booking details (train, date, or class) are missing. Please return to the previous page and try again.
