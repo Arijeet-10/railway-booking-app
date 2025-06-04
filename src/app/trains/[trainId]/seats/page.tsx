@@ -31,7 +31,7 @@ const TrainDetailItem: React.FC<TrainDetailItemProps> = ({ label, value }) => (
 
 const berthColors: Record<Seat['type'], string> = {
   lower: 'bg-yellow-300 border-yellow-400',
-  middle: 'bg-pink-300 border-pink-400', // Kept for 3A
+  middle: 'bg-pink-300 border-pink-400', 
   upper: 'bg-sky-300 border-sky-400',
   side_lower: 'bg-green-400 border-green-500',
   side_upper: 'bg-purple-400 border-purple-500',
@@ -40,13 +40,13 @@ const berthColors: Record<Seat['type'], string> = {
   empty: 'bg-transparent border-transparent',
   legend_title: 'bg-transparent font-bold',
   legend_item: 'bg-transparent',
-  toilet: 'bg-gray-200 border-gray-300 text-gray-600', // Should have been removed from legend, will keep color def
+  toilet: 'bg-gray-200 border-gray-300 text-gray-600',
 };
 
 const legendData: { type: Seat['type']; label: string; colorClass: string }[] = [
     { type: 'door', label: 'Door/Entry', colorClass: berthColors.door },
     { type: 'lower', label: 'Lower Berth', colorClass: berthColors.lower },
-    { type: 'middle', label: 'Middle Berth (3A)', colorClass: berthColors.middle },
+    { type: 'middle', label: 'Middle Berth', colorClass: berthColors.middle },
     { type: 'upper', label: 'Upper Berth', colorClass: berthColors.upper },
     { type: 'side_lower', label: 'Side Lower', colorClass: berthColors.side_lower },
     { type: 'side_upper', label: 'Side Upper', colorClass: berthColors.side_upper },
@@ -83,7 +83,7 @@ export default function TrainSeatAvailabilityPage() {
 
   const [currentMonth, setCurrentMonth] = useState<Date>(startOfMonth(initialDate));
   const [selectedDateForCalendar, setSelectedDateForCalendar] = useState<Date | undefined>(initialDate);
-  const [selectedClass, setSelectedClass] = useState<string>(queryClass || "3A");
+  const [selectedClass, setSelectedClass] = useState<string>(queryClass || "SL"); // Default to SL or queryClass
 
   const [coachLayout, setCoachLayout] = useState<Seat[][]>([]);
   const [userSelectedSeats, setUserSelectedSeats] = useState<string[]>([]); // Stores seat numbers
@@ -111,8 +111,13 @@ export default function TrainSeatAvailabilityPage() {
           details.availableClasses.includes(cls as any)
         );
         if (availableStandardClasses.length > 0) {
-          if (!availableStandardClasses.includes(selectedClass)) {
+          // Ensure selectedClass is one of the available standard classes, or the first if not.
+          if (!availableStandardClasses.includes(selectedClass) && !details.availableClasses.includes(selectedClass as any)) {
             setSelectedClass(availableStandardClasses[0]);
+          } else if (!availableStandardClasses.includes(selectedClass) && details.availableClasses.includes(selectedClass as any)) {
+            // If selectedClass is in availableClasses but not standardClasses, keep it.
+          } else if (!availableStandardClasses.includes(selectedClass)) {
+             setSelectedClass(availableStandardClasses[0]);
           }
         } else if (details.availableClasses.length > 0) {
            setSelectedClass(details.availableClasses[0])
@@ -124,7 +129,7 @@ export default function TrainSeatAvailabilityPage() {
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [trainId, toast]);
+  }, [trainId, toast, selectedClass]); // Added selectedClass to re-evaluate if queryClass changes initial selection
 
 
   const generateAC3TierLayout = useCallback((): Seat[][] => {
@@ -174,53 +179,41 @@ export default function TrainSeatAvailabilityPage() {
   }, []);
 
   const generateAC2TierLayout = useCallback((): Seat[][] => {
-    // AC 2 Tier: Typically 4 main berths (2L, 2U) + 2 side berths (SL, SU) per bay.
-    // Structure for data (each inner array is a vertical column in horizontal view):
-    // [Lower, Upper, Empty (for visual spacing), Aisle, Side Lower/Upper]
     const ac2Layout: Seat[][] = Array(18).fill(null).map(() => Array(5).fill(null).map(() => ({ id: `empty-${Math.random()}`, status: 'empty', type: 'empty' })));
     const entryDisplayText = "ENTRY";
 
-    // Doors at the ends (similar to 3A but with _2A suffix for IDs)
     ac2Layout[0][0] = {id: 'ENTRY_TL_2A', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
-    ac2Layout[0][1] = {id: 'EMPTY_T1_2A', type: 'empty', status: 'empty'}; // No middle
+    ac2Layout[0][1] = {id: 'EMPTY_T1_2A', type: 'empty', status: 'empty'}; 
     ac2Layout[0][2] = {id: 'EMPTY_T2_2A', type: 'empty', status: 'empty'};
     ac2Layout[0][3] = {id: 'AISLE_T_2A', type: 'aisle', status: 'aisle'};
     ac2Layout[0][4] = {id: 'EMPTY_T3_2A', type: 'empty', status: 'empty'};
 
     ac2Layout[17][0] = {id: 'ENTRY_BL_2A', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
-    ac2Layout[17][1] = {id: 'EMPTY_B1_2A', type: 'empty', status: 'empty'}; // No middle
+    ac2Layout[17][1] = {id: 'EMPTY_B1_2A', type: 'empty', status: 'empty'}; 
     ac2Layout[17][2] = {id: 'EMPTY_B2_2A', type: 'empty', status: 'empty'};
     ac2Layout[17][3] = {id: 'AISLE_B_2A', type: 'aisle', status: 'aisle'};
     ac2Layout[17][4] = {id: 'EMPTY_B3_2A', type: 'empty', status: 'empty'};
 
     let currentSeatNum = 1;
-    // Aiming for around 8 bays of 6 seats = 48 seats.
-    // Each bay is represented by 2 segments (columns)
     for (let bay = 0; bay < 8; bay++) {
-        const segment1 = bay * 2 + 1; // First column for this bay
-        const segment2 = segment1 + 1;  // Second column for this bay
+        const segment1 = bay * 2 + 1; 
+        const segment2 = segment1 + 1;  
 
-        // Bay: Main Berths (Compartment 1: L, U; Compartment 2: L, U)
-        // Segment 1 (e.g., left side of compartment)
         ac2Layout[segment1][0] = { id: `S${currentSeatNum}_2A`, number: `${currentSeatNum}`, type: 'lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
         ac2Layout[segment1][1] = { id: `S${currentSeatNum}_2A`, number: `${currentSeatNum}`, type: 'upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac2Layout[segment1][2] = { id: `EMPTY_M1_${bay}_2A`, type: 'empty', status: 'empty' }; // Placeholder for middle berth slot
+        ac2Layout[segment1][2] = { id: `EMPTY_M1_${bay}_2A`, type: 'empty', status: 'empty' }; 
 
-        // Segment 2 (e.g., right side of compartment)
         ac2Layout[segment2][0] = { id: `S${currentSeatNum}_2A`, number: `${currentSeatNum}`, type: 'lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
         ac2Layout[segment2][1] = { id: `S${currentSeatNum}_2A`, number: `${currentSeatNum}`, type: 'upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac2Layout[segment2][2] = { id: `EMPTY_M2_${bay}_2A`, type: 'empty', status: 'empty' }; // Placeholder for middle berth slot
+        ac2Layout[segment2][2] = { id: `EMPTY_M2_${bay}_2A`, type: 'empty', status: 'empty' }; 
 
-        // Side Berths for this bay (across segment1 and segment2 for SL and SU)
         ac2Layout[segment1][4] = { id: `S${currentSeatNum}_2A`, number: `${currentSeatNum}`, type: 'side_lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
         ac2Layout[segment2][4] = { id: `S${currentSeatNum}_2A`, number: `${currentSeatNum}`, type: 'side_upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
         
-        // Aisles for these segments
         ac2Layout[segment1][3] = { id: `AISLE${segment1}_2A`, type: 'aisle', status: 'aisle' };
         ac2Layout[segment2][3] = { id: `AISLE${segment2}_2A`, type: 'aisle', status: 'aisle' };
     }
     
-    // Assign originalColor based on type for all seats
     for (let i = 0; i < ac2Layout.length; i++) {
         for (let j = 0; j < ac2Layout[i].length; j++) {
             const seat = ac2Layout[i][j];
@@ -232,6 +225,54 @@ export default function TrainSeatAvailabilityPage() {
     return ac2Layout;
   }, []);
 
+  const generateSleeperLayout = useCallback((): Seat[][] => {
+    const slLayout: Seat[][] = Array(18).fill(null).map(() => Array(5).fill(null).map(() => ({ id: `empty-${Math.random()}`, status: 'empty', type: 'empty' })));
+    const entryDisplayText = "ENTRY";
+    slLayout[0][0] = {id: 'ENTRY_TL_SL', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
+    slLayout[0][1] = {id: 'EMPTY_T1_SL', type: 'empty', status: 'empty'};
+    slLayout[0][2] = {id: 'EMPTY_T2_SL', type: 'empty', status: 'empty'};
+    slLayout[0][3] = {id: 'AISLE_T_SL', type: 'aisle', status: 'aisle'};
+    slLayout[0][4] = {id: 'EMPTY_T3_SL', type: 'empty', status: 'empty'};
+
+    slLayout[17][0] = {id: 'ENTRY_BL_SL', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
+    slLayout[17][1] = {id: 'EMPTY_B1_SL', type: 'empty', status: 'empty'};
+    slLayout[17][2] = {id: 'EMPTY_B2_SL', type: 'empty', status: 'empty'};
+    slLayout[17][3] = {id: 'AISLE_B_SL', type: 'aisle', status: 'aisle'};
+    slLayout[17][4] = {id: 'EMPTY_B3_SL', type: 'empty', status: 'empty'};
+
+    let currentSeatNum = 1;
+    // Sleeper coaches typically have 72 berths (8 berths per bay, 9 bays).
+    // We'll stick to 8 bays for visual consistency with 3A/2A for now (64 berths).
+    for (let bay = 0; bay < 8; bay++) {
+        const r1 = bay * 2 + 1; 
+        const r2 = r1 + 1;      
+
+        slLayout[r1][0] = { id: `S${currentSeatNum}_SL`, number: `${currentSeatNum}`, type: 'lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        slLayout[r1][1] = { id: `S${currentSeatNum}_SL`, number: `${currentSeatNum}`, type: 'middle', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        slLayout[r1][2] = { id: `S${currentSeatNum}_SL`, number: `${currentSeatNum}`, type: 'upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        
+        slLayout[r2][0] = { id: `S${currentSeatNum}_SL`, number: `${currentSeatNum}`, type: 'lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        slLayout[r2][1] = { id: `S${currentSeatNum}_SL`, number: `${currentSeatNum}`, type: 'middle', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        slLayout[r2][2] = { id: `S${currentSeatNum}_SL`, number: `${currentSeatNum}`, type: 'upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+
+        slLayout[r1][4] = { id: `S${currentSeatNum}_SL`, number: `${currentSeatNum}`, type: 'side_lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        slLayout[r2][4] = { id: `S${currentSeatNum}_SL`, number: `${currentSeatNum}`, type: 'side_upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
+        
+        slLayout[r1][3] = { id: `AISLE${r1}_SL`, type: 'aisle', status: 'aisle' };
+        slLayout[r2][3] = { id: `AISLE${r2}_SL`, type: 'aisle', status: 'aisle' };
+    }
+    
+    for (let i = 0; i < slLayout.length; i++) {
+        for (let j = 0; j < slLayout[i].length; j++) {
+            const seat = slLayout[i][j];
+            if (seat.type && berthColors[seat.type]) {
+                seat.originalColor = berthColors[seat.type];
+            }
+        }
+    }
+    return slLayout;
+  }, []);
+
 
   useEffect(() => {
     if (selectedDateForCalendar && selectedClass && trainDetails) {
@@ -240,10 +281,11 @@ export default function TrainSeatAvailabilityPage() {
             layoutToSet = generateAC3TierLayout();
         } else if (selectedClass === "2A") {
             layoutToSet = generateAC2TierLayout();
+        } else if (selectedClass === "SL") {
+            layoutToSet = generateSleeperLayout();
         } else { 
-            // Fallback for other classes - generic layout
             const rows = 10; 
-            const seatsVisualPerRow = 6; // 3 seats, aisle, 2 seats
+            const seatsVisualPerRow = 6; 
             const newLayout: Seat[][] = [];
             for (let r = 0; r < rows; r++) {
                 const rowSeats: Seat[] = [];
@@ -252,8 +294,8 @@ export default function TrainSeatAvailabilityPage() {
                   const seatNumber = `${String.fromCharCode(65 + r)}${s + 1}`;
                   let type: Seat['type'] = 'middle'; 
                   if (s === 0 || s === seatsVisualPerRow -1 ) type = 'lower'; 
-                  else if (s === 1 || s === seatsVisualPerRow -2) type = 'upper'; // upper for non-AC, or can be window/aisle
-                  else if (s === 2 || s === 3) type = 'aisle'; // Middle seats could be aisle
+                  else if (s === 1 || s === seatsVisualPerRow -2) type = 'upper'; 
+                  else if (s === 2 || s === 3) type = 'aisle'; 
 
                   rowSeats.push({
                       id: seatId, number: seatNumber, status: Math.random() > 0.7 ? 'booked' : 'available', type: type,
@@ -269,7 +311,7 @@ export default function TrainSeatAvailabilityPage() {
     } else {
         setCoachLayout([]); 
     }
-  }, [selectedDateForCalendar, selectedClass, trainDetails, generateAC3TierLayout, generateAC2TierLayout]);
+  }, [selectedDateForCalendar, selectedClass, trainDetails, generateAC3TierLayout, generateAC2TierLayout, generateSleeperLayout]);
 
 
   const handleSeatClick = (seatId: string, seatNumber?: string, currentStatus?: Seat['status']) => {
@@ -413,7 +455,7 @@ export default function TrainSeatAvailabilityPage() {
                 </div>
 
 
-                {coachLayout.length > 0 && (selectedClass === "3A" || selectedClass === "2A") ? (
+                {coachLayout.length > 0 && (selectedClass === "3A" || selectedClass === "2A" || selectedClass === "SL") ? (
                   <div className="mt-6">
                     <h3 className="text-lg font-semibold mb-3 text-center">{selectedClass} Coach Layout (Horizontal)</h3>
                      <div className="flex flex-row overflow-x-auto p-2 border rounded-md bg-muted/10 space-x-0.5 min-h-[200px]"> 
@@ -480,7 +522,7 @@ export default function TrainSeatAvailabilityPage() {
                       </div>
                     )}
                   </div>
-                ) : coachLayout.length > 0 && selectedClass !== "3A" && selectedClass !== "2A" ? ( // Generic layout for other classes
+                ) : coachLayout.length > 0 && selectedClass !== "3A" && selectedClass !== "2A" && selectedClass !== "SL" ? ( 
                     <div className="mt-6"> 
                          <h3 className="text-lg font-semibold mb-2">Select Your Seats (Coach: {selectedClass})</h3>
                          <div className="border p-2 rounded-md bg-muted/20 max-w-md mx-auto">
@@ -535,7 +577,7 @@ export default function TrainSeatAvailabilityPage() {
                   <Alert className="mt-6">
                     <XCircle className="h-4 w-4"/>
                     <AlertDescription>
-                      { (selectedClass === "3A" || selectedClass === "2A") ? `Generating ${selectedClass} layout...` : "No specific seat layout for this class in the demo, or data is still loading. Please select a valid date."}
+                      { (selectedClass === "3A" || selectedClass === "2A" || selectedClass === "SL") ? `Generating ${selectedClass} layout...` : "No specific seat layout for this class in the demo, or data is still loading. Please select a valid date."}
                     </AlertDescription>
                   </Alert>
                 )}
