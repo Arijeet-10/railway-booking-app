@@ -7,9 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Ticket, Users, CalendarDays, Train, CreditCard, ShieldCheck, Home, ArrowLeft, Loader2 } from 'lucide-react';
+import { Ticket, Users, CalendarDays, Train, CreditCard, ShieldCheck, Home, ArrowLeft, Loader2, Info } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import type { PassengerFormValues, Booking, GstDetails } from '@/lib/types'; // Added Booking, GstDetails
+import type { PassengerFormValues, Booking, GstDetails } from '@/lib/types'; 
 import { MOCK_TRAINS } from '@/lib/mock-data';
 import type { TrainDetailed } from '@/lib/types';
 import { auth, firestore } from '@/lib/firebase/config';
@@ -32,6 +32,8 @@ export default function PaymentPage() {
 
   const [passengers, setPassengers] = useState<PassengerFormValues[]>([]);
   const [trainDetails, setTrainDetails] = useState<TrainDetailed | null>(null);
+  const [ticketFare, setTicketFare] = useState(0);
+  const [convenienceFee, setConvenienceFee] = useState(0);
   const [totalPrice, setTotalPrice] = useState(0);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
@@ -47,14 +49,18 @@ export default function PaymentPage() {
       })));
     }
 
-    if (trainId) {
+    if (trainId && numPassengersQuery) {
       const foundTrain = MOCK_TRAINS.find(t => t.id === trainId);
       if (foundTrain) {
         setTrainDetails(foundTrain);
-        const pricePerPassenger = foundTrain.price; // This is assumed to be ticketFare
-        const numActualPassengers = parseInt(numPassengersQuery || '0', 10);
+        const pricePerPassenger = foundTrain.price; 
+        const numActualPassengers = parseInt(numPassengersQuery, 10);
+        
         const calculatedTicketFare = pricePerPassenger * numActualPassengers;
-        const calculatedConvenienceFee = 11.80 * numActualPassengers; // Mock convenience fee
+        const calculatedConvenienceFee = 11.80 * numActualPassengers; // Mock convenience fee per passenger
+
+        setTicketFare(calculatedTicketFare);
+        setConvenienceFee(calculatedConvenienceFee);
         setTotalPrice(calculatedTicketFare + calculatedConvenienceFee);
 
       }
@@ -75,25 +81,21 @@ export default function PaymentPage() {
       setIsProcessingPayment(false);
       return;
     }
-
-    const numActualPassengers = parseInt(numPassengersQuery || '0', 10);
-    const calculatedTicketFare = trainDetails.price * numActualPassengers;
-    const calculatedConvenienceFee = 11.80 * numActualPassengers; // Mock convenience fee based on PDF
-
+    
     const mockGstDetails: GstDetails = {
       invoiceNumber: `PS${Date.now().toString().slice(-10)}`,
       supplierSacCode: "996421",
-      supplierGstin: "07AAAGM0289C1ZL", // Mock
-      supplierAddress: "Indian Railways, New Delhi", // Mock
+      supplierGstin: "07AAAGM0289C1ZL", 
+      supplierAddress: "Indian Railways, New Delhi", 
       recipientGstin: "NA",
       recipientName: currentUser.displayName || "NA",
-      recipientAddress: "NA", // Mock
-      taxableValue: calculatedTicketFare, // Assuming ticket fare is taxable value
+      recipientAddress: "NA", 
+      taxableValue: ticketFare, 
       cgstRate: "2.5%",
-      cgstAmount: calculatedTicketFare * 0.025,
-      sgstUtgstRate: "2.5%", // Or NA based on region
-      sgstUtgstAmount: calculatedTicketFare * 0.025,
-      igstRate: "0.0%", // Or 5% if applicable
+      cgstAmount: ticketFare * 0.025,
+      sgstUtgstRate: "2.5%", 
+      sgstUtgstAmount: ticketFare * 0.025,
+      igstRate: "0.0%", 
       igstAmount: 0,
     };
 
@@ -111,18 +113,17 @@ export default function PaymentPage() {
       passengersList: passengers, 
       seats: passengers.map(p => p.name), 
       numPassengers: passengers.length,
-      totalPrice: totalPrice, // This is already calculated and includes convenience fee
+      totalPrice: totalPrice,
+      ticketFare: ticketFare, // Storing calculated ticket fare
+      convenienceFee: convenienceFee, // Storing calculated convenience fee
       status: 'upcoming',
       bookingDate: new Date().toISOString(),
-      selectedClass: selectedClassQuery.toUpperCase(), // Store query param directly
+      selectedClass: selectedClassQuery.toUpperCase(), 
 
-      // New fields with mock data
-      pnr: Math.random().toString().slice(2, 12), // Random 10-digit PNR
-      quota: "GENERAL (GN)", // Mock
-      distance: `${Math.floor(Math.random() * 500) + 200} KM`, // Mock distance
-      transactionId: `TRN${Date.now()}`, // Mock transaction ID
-      ticketFare: calculatedTicketFare,
-      convenienceFee: calculatedConvenienceFee,
+      pnr: Math.random().toString().slice(2, 12), 
+      quota: "GENERAL (GN)", 
+      distance: `${Math.floor(Math.random() * 500) + 200} KM`, 
+      transactionId: `TRN${Date.now()}`, 
       gstDetails: mockGstDetails,
     };
 
@@ -209,10 +210,19 @@ export default function PaymentPage() {
               </div>
             )}
             
-            <div className="border-t pt-4 mt-4">
-                <p className="text-xl font-bold text-right">
-                    Total Amount: <span className="text-green-600">₹{totalPrice.toFixed(2)}</span>
-                </p>
+            <div className="border-t pt-4 mt-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Ticket Fare:</span>
+                    <span>₹{ticketFare.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">IRCTC Convenience Fee (Incl. GST):</span>
+                    <span>₹{convenienceFee.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold mt-2">
+                    <span>Total Amount:</span>
+                    <span className="text-green-600">₹{totalPrice.toFixed(2)}</span>
+                </div>
             </div>
 
             <Alert className="mt-6 border-green-500/50 bg-green-500/5">
@@ -243,3 +253,4 @@ export default function PaymentPage() {
     </ClientAuthGuard>
   );
 }
+
