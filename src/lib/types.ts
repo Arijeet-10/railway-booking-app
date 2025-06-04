@@ -1,0 +1,65 @@
+export interface UserProfile {
+  uid: string;
+  email: string | null;
+  displayName?: string | null;
+  photoURL?: string | null;
+  emailVerified?: boolean;
+}
+
+export interface Train {
+  id: string;
+  trainName: string;
+  trainNumber: string;
+  origin: string;
+  destination: string;
+  departureTime: string; 
+  arrivalTime: string;   
+  duration: string;      
+  price: number;
+  availableClasses: Array<'economy' | 'business' | 'first'>;
+}
+
+export interface Seat {
+  id: string; 
+  coach: string; 
+  status: 'available' | 'booked' | 'selected' | 'unavailable';
+  type?: 'window' | 'aisle' | 'middle';
+  number: string; // e.g. "1A", "12C"
+}
+
+export interface Booking {
+  id: string;
+  userId: string;
+  trainId: string;
+  trainName: string;
+  trainNumber: string;
+  origin: string;
+  destination: string;
+  bookingDate: string; 
+  travelDate: string;  // YYYY-MM-DD
+  departureTime: string;
+  arrivalTime: string;
+  seats: string[]; 
+  totalPrice: number;
+  status: 'upcoming' | 'completed' | 'cancelled';
+}
+
+export interface SmartSuggestionInputParams {
+    origin: string;
+    destination: string;
+    date: string; // YYYY-MM-DD
+}
+
+export type PastRoute = {
+  origin: string;
+  destination: string;
+  date: string; // YYYY-MM-DD
+};
+
+export type PopularRoute = {
+  origin: string;
+  destination: string;
+};
+
+// AI Flow specific types (already defined in smart-train-suggestions.ts, re-exporting or aligning for consistency)
+export type { SmartTrainSuggestionsInput, SmartTrainSuggestionsOutput } from '@/ai/flows/smart-train-suggestions';
