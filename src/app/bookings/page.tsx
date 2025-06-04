@@ -1,4 +1,4 @@
-tsx
+
 import ClientAuthGuard from '@/components/ClientAuthGuard';
 import { BookingCard } from '@/components/bookings/booking-card';
 import type { Booking } from '@/lib/types';

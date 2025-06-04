@@ -1,4 +1,4 @@
-tsx
+
 import TrainSearchForm from '@/components/trains/train-search-form';
 import { TrainCard } from '@/components/trains/train-card';
 import type { Train } from '@/lib/types';

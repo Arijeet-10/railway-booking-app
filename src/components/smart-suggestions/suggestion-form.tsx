@@ -74,8 +74,8 @@ export default function SuggestionForm() {
       origin: values.origin,
       destination: values.destination,
       date: format(values.date, "yyyy-MM-dd"),
-      pastRoutes: MOCK_PAST_ROUTES, 
-      popularRoutes: MOCK_POPULAR_ROUTES, 
+      pastRoutes: MOCK_PAST_ROUTES,
+      popularRoutes: MOCK_POPULAR_ROUTES,
     };
 
     try {
@@ -92,7 +92,7 @@ export default function SuggestionForm() {
       setIsLoading(false);
     }
   }
-  
+
   if (authLoading) {
      return <div className="flex justify-center items-center p-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
