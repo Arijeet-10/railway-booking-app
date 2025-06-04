@@ -29,11 +29,12 @@ export interface TrainDetailed extends Train {
 
 
 export interface Seat {
-  id: string;
-  coach: string;
-  status: 'available' | 'booked' | 'selected' | 'unavailable';
-  type?: 'window' | 'aisle' | 'middle';
-  number: string; // e.g. "1A", "12C"
+  id: string; // Unique ID for React key, e.g., "S1", "TOILET_TOP_1"
+  number?: string; // Actual seat number, e.g., "1", "64"
+  status: 'available' | 'booked' | 'selected' | 'unavailable' | 'aisle' | 'info'; // 'info' for non-selectable text like TOILET
+  type: 'lower' | 'middle' | 'upper' | 'side_lower' | 'side_upper' | 'toilet' | 'door' | 'aisle' | 'empty' | 'legend_title' | 'legend_item';
+  displayText?: string; // For elements like "TOILET", "LEGENDS"
+  originalColor?: string; // To store the berth color
 }
 
 // Extend PassengerFormValues for PDF
@@ -72,7 +73,7 @@ export interface Booking {
   travelDate: string;  // YYYY-MM-DD, e.g. "2023-08-28"
   departureTime: string; // HH:MM
   arrivalTime: string; // HH:MM
-  seats: string[]; // Legacy, use passengersList for names for new bookings.
+  seats: string[]; // Array of selected seat numbers/IDs
   totalPrice: number; // Final total price paid
   status: 'upcoming' | 'completed' | 'cancelled';
   selectedClass: string; // e.g. "SLEEPER CLASS (SL)" or just "SL"
