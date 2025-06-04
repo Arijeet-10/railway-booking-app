@@ -1,6 +1,8 @@
+
 import Logo from '@/components/Logo';
 import NavLink from '@/components/NavLink';
-import AuthButton from './auth-button'; // To be created
+import AuthButton from './auth-button';
+import { ThemeToggleButton } from '@/components/theme-toggle-button';
 
 const AppHeader = () => {
   return (
@@ -12,7 +14,8 @@ const AppHeader = () => {
           <NavLink href="/smart-suggestions">Smart Suggestions</NavLink>
           {/* More links can be added here */}
         </nav>
-        <div className="flex items-center">
+        <div className="flex items-center space-x-2">
+          <ThemeToggleButton />
           <AuthButton />
         </div>
       </div>
