@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useAuth } from '@/hooks/useAuth';
@@ -12,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { LogOut, UserCircle, Ticket, Lightbulb, Loader2 } from 'lucide-react';
+import { LogOut, UserCircle, Ticket, Lightbulb, Loader2, BarChart3 } from 'lucide-react'; // Added BarChart3
 import { signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase/config';
 import { useToast } from '@/hooks/use-toast';
@@ -72,6 +73,12 @@ const AuthButton = () => {
               My Bookings
             </Link>
           </DropdownMenuItem>
+           <DropdownMenuItem asChild>
+            <Link href="/analytics" className="flex items-center">
+              <BarChart3 className="mr-2 h-4 w-4" />
+              Analytics
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuItem asChild>
              <Link href="/smart-suggestions" className="flex items-center">
                 <Lightbulb className="mr-2 h-4 w-4" />
@@ -106,3 +113,4 @@ const AuthButton = () => {
 };
 
 export default AuthButton;
+
