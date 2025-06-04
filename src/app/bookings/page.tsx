@@ -120,12 +120,11 @@ export default function BookingsPage() {
 
          <section className="mt-12 text-center">
             <Image 
-                src="https://placehold.co/800x300.png" 
+                src="https://images.unsplash.com/photo-1602900103084-1d83fc717471?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwzfHxpbmRpYW4lMjByYWlsd2F5c3xlbnwwfHx8fDE3NDkwNTY5OTJ8MA&ixlib=rb-4.1.0&q=80&w=1080" 
                 alt="Scenic Indian train journey" 
                 width={800} 
                 height={300} 
                 className="w-full h-auto object-cover rounded-lg shadow-md"
-                data-ai-hint="Indian railway"
             />
             <p className="mt-4 text-muted-foreground">Ready for your next adventure? <a href="/" className="text-accent hover:underline">Search for trains now!</a></p>
         </section>
