@@ -6,7 +6,7 @@ import ClientAuthGuard from '@/components/ClientAuthGuard';
 import { useAuth } from '@/hooks/useAuth';
 import type { Booking } from '@/lib/types';
 import { firestore } from '@/lib/firebase/config';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,17 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
 import { format, parseISO, addDays } from 'date-fns';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 export default function ManageBookingPage() {
   const params = useParams();
@@ -27,6 +38,8 @@ export default function ManageBookingPage() {
   const [booking, setBooking] = useState<Booking | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
 
   useEffect(() => {
     if (authLoading || !user || !bookingId) {
@@ -69,11 +82,34 @@ export default function ManageBookingPage() {
     fetchBookingDetails();
   }, [bookingId, user, authLoading, router, toast]);
 
-  const handleCancelBooking = () => {
-    toast({
-      title: "Cancel Booking (Not Implemented)",
-      description: "This feature will be available soon.",
-    });
+  const handleCancelBookingTrigger = () => {
+    setIsCancelDialogOpen(true);
+  };
+
+  const confirmCancelBooking = async () => {
+    if (!booking) return;
+    setIsCancelling(true);
+    try {
+      const bookingRef = doc(firestore, 'bookings', booking.id);
+      await updateDoc(bookingRef, {
+        status: 'cancelled'
+      });
+      setBooking(prev => prev ? { ...prev, status: 'cancelled' } : null);
+      toast({
+        title: "Booking Cancelled",
+        description: "Your booking has been successfully cancelled.",
+      });
+      setIsCancelDialogOpen(false);
+    } catch (err) {
+      console.error("Error cancelling booking:", err);
+      toast({
+        title: "Cancellation Failed",
+        description: "Could not cancel the booking. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsCancelling(false);
+    }
   };
 
   const handleModifyPassengers = () => {
@@ -114,25 +150,22 @@ export default function ManageBookingPage() {
       else if (type === 'draw') doc.setDrawColor(colorArray[0], colorArray[1], colorArray[2]);
     };
 
-    // Header Block
     setColor(colors.primary, 'fill');
-    doc.rect(0, 0, pageWidth, 70, 'F'); // Slightly shorter header
+    doc.rect(0, 0, pageWidth, 70, 'F'); 
     setColor(colors.white, 'text');
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
     doc.text("ELECTRONIC RESERVATION SLIP (ERS)", pageWidth / 2, currentY - 10, { align: 'center' });
     
-    setColor(colors.white, 'fill'); // Placeholder for "WL"
+    setColor(colors.white, 'fill'); 
     doc.roundedRect(pageWidth - margin - 50, currentY - 25, 40, 18, 3, 3, 'F');
     setColor(colors.primary, 'text');
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.text("CNF", pageWidth - margin - 30, currentY - 12 , { align: 'center' });
 
+    currentY += 40; 
 
-    currentY += 40; // Start content below the blue header bar
-
-    // Journey Information Block
     const journeyCardY = currentY;
     const journeyCardHeight = 110;
     setColor(colors.light, 'fill');
@@ -153,7 +186,7 @@ export default function ManageBookingPage() {
     doc.setFont('helvetica', 'bold');
     doc.text("Boarding At:", margin + 10, textY);
     doc.setFont('helvetica', 'normal');
-    doc.text(booking.origin.toUpperCase(), margin + 90, textY); // Assuming boarding is same as origin
+    doc.text(booking.origin.toUpperCase(), margin + 90, textY); 
 
     textY += 20;
     doc.setFont('helvetica', 'bold');
@@ -161,7 +194,6 @@ export default function ManageBookingPage() {
     doc.setFont('helvetica', 'normal');
     doc.text(booking.destination.toUpperCase(), margin + 90, textY);
 
-    // Departure/Arrival Times on the right side of Journey Block
     const journeyRightX = margin + contentWidth / 2 + 20;
     textY = journeyCardY + 15;
     doc.setFontSize(9);
@@ -175,7 +207,6 @@ export default function ManageBookingPage() {
     doc.text("Arrival:", journeyRightX, textY);
     doc.setFont('helvetica', 'normal');
     
-    // Calculate arrival date
     const departureDate = parseISO(booking.travelDate + "T00:00:00");
     let arrivalDateCalc = departureDate;
     if (parseInt(booking.arrivalTime.split(':')[0]) < parseInt(booking.departureTime.split(':')[0])) {
@@ -185,9 +216,8 @@ export default function ManageBookingPage() {
 
     currentY = journeyCardY + journeyCardHeight + 15;
 
-    // PNR / Train / Class Block
     const pnrTrainClassCardY = currentY;
-    const pnrTrainClassCardHeight = 80; // Reduced height
+    const pnrTrainClassCardHeight = 80; 
     setColor(colors.light, 'fill');
     doc.roundedRect(margin, pnrTrainClassCardY, contentWidth, pnrTrainClassCardHeight, 5, 5, 'F');
     setColor(colors.dark, 'draw');
@@ -220,11 +250,10 @@ export default function ManageBookingPage() {
 
     currentY = pnrTrainClassCardY + pnrTrainClassCardHeight + 15;
 
-    // Passenger Details Table
     const passengerHeaderY = currentY;
     setColor(colors.dark, 'fill');
     doc.roundedRect(margin, passengerHeaderY, contentWidth, 25, 5, 5, 'F');
-    doc.rect(margin, passengerHeaderY + 15, contentWidth, 10, 'F'); // bottom part of rounded header
+    doc.rect(margin, passengerHeaderY + 15, contentWidth, 10, 'F'); 
     setColor(colors.white, 'text');
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
@@ -236,7 +265,7 @@ export default function ManageBookingPage() {
     let tableHeaderX = margin;
 
     setColor(colors.mutedText, 'fill');
-    doc.rect(margin, currentY, contentWidth, 20, 'F'); // Table header background
+    doc.rect(margin, currentY, contentWidth, 20, 'F'); 
     setColor(colors.dark, 'text');
     doc.setFontSize(8);
     doc.setFont('helvetica', 'bold');
@@ -248,7 +277,12 @@ export default function ManageBookingPage() {
     currentY += 20;
 
     booking.passengersList.forEach((passenger, index) => {
-      if (index % 2 !== 0) { // Alternate row color
+      if (currentY + 18 > pageHeight - margin - 50) { // Check for new page
+        doc.addPage();
+        currentY = margin;
+         // Redraw passenger table header on new page if needed (optional)
+      }
+      if (index % 2 !== 0) { 
          setColor(colors.light, 'fill');
          doc.rect(margin, currentY, contentWidth, 18, 'F');
       }
@@ -270,15 +304,13 @@ export default function ManageBookingPage() {
       
       currentY += 18;
     });
-    setColor(colors.dark, 'draw'); // Border for table
+    setColor(colors.dark, 'draw'); 
     doc.rect(margin, passengerTableStartY, contentWidth, currentY - passengerTableStartY, 'S');
 
+    currentY += 15; 
 
-    currentY += 15; // Space after passenger table
-
-    // Payment Details Section
     const paymentCardY = currentY;
-    const paymentCardHeight = 100; // Reduced
+    const paymentCardHeight = 100; 
     setColor(colors.light, 'fill');
     doc.roundedRect(margin, paymentCardY, contentWidth, paymentCardHeight, 5, 5, 'F');
     setColor(colors.dark, 'draw');
@@ -310,7 +342,6 @@ export default function ManageBookingPage() {
     });
     currentY = paymentCardY + paymentCardHeight + 10;
 
-    // Transaction ID and GST details (simplified)
     setColor(colors.text, 'text');
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
@@ -320,10 +351,9 @@ export default function ManageBookingPage() {
     doc.text(`SAC Code: ${booking.gstDetails?.supplierSacCode || 'N/A'}`, margin + contentWidth / 2, currentY);
     currentY += 12;
 
-    // Important Notes Section
     const notesHeaderY = currentY;
     setColor(colors.danger, 'fill');
-    doc.roundedRect(margin, notesHeaderY, contentWidth, 20, 5, 5, 'F'); // Shorter header
+    doc.roundedRect(margin, notesHeaderY, contentWidth, 20, 5, 5, 'F'); 
     doc.rect(margin, notesHeaderY + 10, contentWidth, 10, 'F');
     setColor(colors.white, 'text');
     doc.setFontSize(10);
@@ -337,18 +367,17 @@ export default function ManageBookingPage() {
       "This ticket is booked on personal User ID. Sale/Purchase is punishable under Railways Act.",
     ];
     setColor(colors.text, 'text');
-    doc.setFontSize(7); // Smaller font for notes
+    doc.setFontSize(7); 
     doc.setFont('helvetica', 'normal');
     notes.forEach(note => {
-      if (currentY < pageHeight - margin - 30) { // Check if space left before footer
-        const splitText = doc.splitTextToSize(note, contentWidth - 10); // -10 for internal padding
+      if (currentY < pageHeight - margin - 60) { 
+        const splitText = doc.splitTextToSize(note, contentWidth - 10); 
         doc.text(splitText, margin + 5, currentY);
-        currentY += (splitText.length * 9) + 2; // 9pt line height for 7pt font
+        currentY += (splitText.length * 9) + 2; 
       }
     });
     
-    // Footer
-    currentY = pageHeight - 50; // Position footer
+    currentY = pageHeight - 50; 
     setColor(colors.light, 'fill');
     doc.rect(0, currentY, pageWidth, 50, 'F');
     setColor(colors.mutedText, 'text');
@@ -479,7 +508,6 @@ export default function ManageBookingPage() {
                 </ul>
               ) : (
                 <ul className="list-disc list-inside pl-4 space-y-1 text-sm">
-                  {/* Fallback if passengersList is somehow empty but seats exist (legacy) */}
                   {(booking.seats || []).map((seatName, index) => (
                     <li key={index}>{seatName}</li>
                   ))}
@@ -497,9 +525,33 @@ export default function ManageBookingPage() {
               <Button variant="default" onClick={handleDownloadTicket}>
                 <Download className="mr-2 h-4 w-4" /> Download Ticket
               </Button>
-              <Button variant="destructive" onClick={handleCancelBooking}>
-                <Trash2 className="mr-2 h-4 w-4" /> Cancel Booking
-              </Button>
+              <AlertDialog open={isCancelDialogOpen} onOpenChange={setIsCancelDialogOpen}>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" onClick={handleCancelBookingTrigger}>
+                    <Trash2 className="mr-2 h-4 w-4" /> Cancel Booking
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure you want to cancel?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently cancel your booking.
+                      Cancellation charges may apply as per railway rules.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isCancelling}>Back</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={confirmCancelBooking}
+                      disabled={isCancelling}
+                      className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                    >
+                      {isCancelling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                      Yes, Cancel Booking
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </CardFooter>
           )}
           {booking.status === 'completed' && (
