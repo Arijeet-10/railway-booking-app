@@ -9,12 +9,13 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Ticket, Users, CalendarDays, Train, CreditCard, ShieldCheck, Home, ArrowLeft, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import type { PassengerFormValues } from '@/components/bookings/passenger-form';
+import type { PassengerFormValues, Booking, GstDetails } from '@/lib/types'; // Added Booking, GstDetails
 import { MOCK_TRAINS } from '@/lib/mock-data';
 import type { TrainDetailed } from '@/lib/types';
-import { auth, firestore } from '@/lib/firebase/config'; // Added firestore
-import { collection, addDoc } from "firebase/firestore"; // Firestore functions
+import { auth, firestore } from '@/lib/firebase/config';
+import { collection, addDoc } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 
 export default function PaymentPage() {
@@ -24,7 +25,7 @@ export default function PaymentPage() {
 
   const trainId = searchParams.get('trainId');
   const date = searchParams.get('date'); // This is YYYY-MM-DD string
-  const selectedClass = searchParams.get('class');
+  const selectedClassQuery = searchParams.get('class');
   const origin = searchParams.get('origin');
   const destination = searchParams.get('destination');
   const numPassengersQuery = searchParams.get('numPassengers'); // String from query
@@ -37,17 +38,25 @@ export default function PaymentPage() {
   useEffect(() => {
     const storedPassengers = localStorage.getItem('pendingBookingPassengers');
     if (storedPassengers) {
-      const parsedPassengers = JSON.parse(storedPassengers) as PassengerFormValues[];
-      setPassengers(parsedPassengers);
+      const parsedPassengers: PassengerFormValues[] = JSON.parse(storedPassengers);
+      // Add mock bookingStatus and currentStatus for PDF generation
+      setPassengers(parsedPassengers.map(p => ({
+        ...p,
+        bookingStatus: p.age && p.age > 18 ? 'CNF/S10/34' : 'WL/15', // Mock status
+        currentStatus: p.age && p.age > 18 ? 'CNF/S10/34' : 'WL/5', // Mock status
+      })));
     }
 
     if (trainId) {
       const foundTrain = MOCK_TRAINS.find(t => t.id === trainId);
       if (foundTrain) {
         setTrainDetails(foundTrain);
-        const pricePerPassenger = foundTrain.price;
+        const pricePerPassenger = foundTrain.price; // This is assumed to be ticketFare
         const numActualPassengers = parseInt(numPassengersQuery || '0', 10);
-        setTotalPrice(pricePerPassenger * numActualPassengers);
+        const calculatedTicketFare = pricePerPassenger * numActualPassengers;
+        const calculatedConvenienceFee = 11.80 * numActualPassengers; // Mock convenience fee
+        setTotalPrice(calculatedTicketFare + calculatedConvenienceFee);
+
       }
     }
   }, [trainId, numPassengersQuery]);
@@ -57,7 +66,7 @@ export default function PaymentPage() {
     setIsProcessingPayment(true);
     const currentUser = auth.currentUser;
 
-    if (!currentUser || !trainDetails || !trainId || !date || !selectedClass || !origin || !destination || passengers.length === 0) {
+    if (!currentUser || !trainDetails || !trainId || !date || !selectedClassQuery || !origin || !destination || passengers.length === 0) {
       toast({
         title: "Error",
         description: "Missing booking information or user not logged in. Cannot proceed.",
@@ -67,30 +76,61 @@ export default function PaymentPage() {
       return;
     }
 
-    const bookingData = {
+    const numActualPassengers = parseInt(numPassengersQuery || '0', 10);
+    const calculatedTicketFare = trainDetails.price * numActualPassengers;
+    const calculatedConvenienceFee = 11.80 * numActualPassengers; // Mock convenience fee based on PDF
+
+    const mockGstDetails: GstDetails = {
+      invoiceNumber: `PS${Date.now().toString().slice(-10)}`,
+      supplierSacCode: "996421",
+      supplierGstin: "07AAAGM0289C1ZL", // Mock
+      supplierAddress: "Indian Railways, New Delhi", // Mock
+      recipientGstin: "NA",
+      recipientName: currentUser.displayName || "NA",
+      recipientAddress: "NA", // Mock
+      taxableValue: calculatedTicketFare, // Assuming ticket fare is taxable value
+      cgstRate: "2.5%",
+      cgstAmount: calculatedTicketFare * 0.025,
+      sgstUtgstRate: "2.5%", // Or NA based on region
+      sgstUtgstAmount: calculatedTicketFare * 0.025,
+      igstRate: "0.0%", // Or 5% if applicable
+      igstAmount: 0,
+    };
+
+
+    const bookingData: Booking = {
       userId: currentUser.uid,
       trainId: trainId,
       trainName: trainDetails.trainName,
       trainNumber: trainDetails.trainNumber,
       origin: origin,
       destination: destination,
-      travelDate: date, // Already YYYY-MM-DD
+      travelDate: date, 
       departureTime: trainDetails.departureTime,
       arrivalTime: trainDetails.arrivalTime,
-      passengersList: passengers, // Store full passenger details
-      seats: passengers.map(p => p.name), // For quick display on booking card
+      passengersList: passengers, 
+      seats: passengers.map(p => p.name), 
       numPassengers: passengers.length,
-      totalPrice: totalPrice,
-      status: 'upcoming' as 'upcoming' | 'completed' | 'cancelled',
+      totalPrice: totalPrice, // This is already calculated and includes convenience fee
+      status: 'upcoming',
       bookingDate: new Date().toISOString(),
-      selectedClass: selectedClass,
+      selectedClass: selectedClassQuery.toUpperCase(), // Store query param directly
+
+      // New fields with mock data
+      pnr: Math.random().toString().slice(2, 12), // Random 10-digit PNR
+      quota: "GENERAL (GN)", // Mock
+      distance: `${Math.floor(Math.random() * 500) + 200} KM`, // Mock distance
+      transactionId: `TRN${Date.now()}`, // Mock transaction ID
+      ticketFare: calculatedTicketFare,
+      convenienceFee: calculatedConvenienceFee,
+      gstDetails: mockGstDetails,
     };
 
     try {
-      await addDoc(collection(firestore, "bookings"), bookingData);
+      const docRef = await addDoc(collection(firestore, "bookings"), bookingData);
       toast({
         title: "Payment Successful!",
-        description: "Your booking is confirmed and details saved.",
+        description: `Your booking (ID: ${docRef.id}) is confirmed and details saved.`,
       });
       localStorage.removeItem('pendingBookingPassengers');
       router.push('/bookings');
@@ -107,7 +147,7 @@ export default function PaymentPage() {
   };
 
 
-  if (!trainId || !date || !selectedClass || !numPassengersQuery) {
+  if (!trainId || !date || !selectedClassQuery || !numPassengersQuery) {
     return (
         <ClientAuthGuard>
             <div className="max-w-md mx-auto py-12">
@@ -151,8 +191,8 @@ export default function PaymentPage() {
                     <AlertDescription className="mt-2 space-y-1 text-sm">
                         <p><strong>Train:</strong> {trainDetails.trainName} ({trainDetails.trainNumber})</p>
                         <p><strong>Route:</strong> {origin} to {destination}</p>
-                        <p><strong>Date:</strong> {new Date(date + "T00:00:00").toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-                        <p><strong>Class:</strong> <span className="font-semibold">{selectedClass.toUpperCase()}</span></p>
+                        <p><strong>Date:</strong> {format(new Date(date + "T00:00:00"), 'PPP')}</p>
+                        <p><strong>Class:</strong> <span className="font-semibold">{selectedClassQuery.toUpperCase()}</span></p>
                         <p><strong>Passengers:</strong> {numPassengers}</p>
                     </AlertDescription>
                 </Alert>
@@ -164,7 +204,7 @@ export default function PaymentPage() {
                     <Users className="mr-2 h-5 w-5 text-muted-foreground" /> Passengers ({passengers.length})
                 </h3>
                 <ul className="list-disc list-inside pl-4 space-y-1 text-sm text-muted-foreground max-h-32 overflow-y-auto">
-                  {passengers.map((p, i) => <li key={i}>{p.name} (Age: {p.age}, Gender: {p.gender}, Berth: {p.preferredBerth.replace(/_/g, ' ')})</li>)}
+                  {passengers.map((p, i) => <li key={i}>{p.name} (Age: {p.age}, Gender: {p.gender.charAt(0).toUpperCase() + p.gender.slice(1)}, Berth: {p.preferredBerth.replace(/_/g, ' ').split(' ').map(w=>w.charAt(0).toUpperCase() + w.slice(1)).join(' ')})</li>)}
                 </ul>
               </div>
             )}
@@ -192,7 +232,7 @@ export default function PaymentPage() {
                 size="lg" 
                 onClick={handleConfirmPayment} 
                 className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
-                disabled={isProcessingPayment || passengers.length === 0}
+                disabled={isProcessingPayment || passengers.length === 0 || !trainDetails}
             >
               {isProcessingPayment ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
               {isProcessingPayment ? 'Processing...' : `Confirm & Pay ₹${totalPrice.toFixed(2)}`}

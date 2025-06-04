@@ -15,6 +15,7 @@ import { Loader2, AlertTriangle, Ticket, CalendarDays, Users, MapPin, Trash2, Do
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import jsPDF from 'jspdf';
+import { format, parseISO } from 'date-fns';
 
 export default function ManageBookingPage() {
   const params = useParams();
@@ -88,122 +89,209 @@ export default function ManageBookingPage() {
       return;
     }
 
-    const doc = new jsPDF();
-    let yPos = 20;
-    const lineSpacing = 7;
-    const sectionSpacing = 12;
-    const leftMargin = 20;
-    const contentStartMargin = 50;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
-    const rightMargin = pageWidth - 20;
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 30;
+    const contentWidth = pageWidth - 2 * margin;
+    let yPos = margin;
 
-    // Main Title
-    doc.setFontSize(20);
-    doc.setFont(undefined, 'bold');
-    doc.text("Indian Rail Connect - eTicket", pageWidth / 2, yPos, { align: "center" });
-    doc.setFont(undefined, 'normal');
-    yPos += sectionSpacing;
+    doc.setFont('helvetica', 'normal');
 
-    // Booking Info
+    // WL and Title
     doc.setFontSize(10);
-    doc.text(`Booking ID: ${booking.id}`, leftMargin, yPos);
-    doc.text(`Booked On: ${new Date(booking.bookingDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} ${new Date(booking.bookingDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`, rightMargin, yPos, {align: 'right'});
-    yPos += sectionSpacing;
-    
-    doc.setLineWidth(0.2);
-    doc.line(leftMargin, yPos - (sectionSpacing / 2), rightMargin, yPos - (sectionSpacing / 2));
-
-
-    // Journey Details Section
-    doc.setFontSize(14);
-    doc.setFont(undefined, 'bold');
-    doc.text("Journey Details", leftMargin, yPos);
-    doc.setFont(undefined, 'normal');
-    yPos += lineSpacing + 2;
-
-    const journeyDetails = [
-        { label: "Train:", value: `${booking.trainName} (${booking.trainNumber})` },
-        { label: "From:", value: booking.origin },
-        { label: "To:", value: booking.destination },
-        { label: "Date:", value: new Date(booking.travelDate + "T00:00:00").toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) },
-        { label: "Departure:", value: booking.departureTime },
-        { label: "Arrival:", value: booking.arrivalTime },
-        { label: "Class:", value: booking.selectedClass.toUpperCase() },
-    ];
-
-    doc.setFontSize(11);
-    journeyDetails.forEach(detail => {
-        doc.setFont(undefined, 'bold');
-        doc.text(detail.label, leftMargin, yPos);
-        doc.setFont(undefined, 'normal');
-        doc.text(detail.value, contentStartMargin, yPos);
-        yPos += lineSpacing;
-    });
-    yPos += sectionSpacing - lineSpacing;
-    doc.line(leftMargin, yPos - (sectionSpacing / 2), rightMargin, yPos - (sectionSpacing / 2));
-
-    // Passenger Details Section
-    doc.setFontSize(14);
-    doc.setFont(undefined, 'bold');
-    doc.text("Passenger Details", leftMargin, yPos);
-    doc.setFont(undefined, 'normal');
-    yPos += lineSpacing + 2;
-
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'bold');
-    doc.text("S.No.", leftMargin, yPos);
-    doc.text("Name", leftMargin + 15, yPos);
-    doc.text("Age", leftMargin + 80, yPos);
-    doc.text("Gender", leftMargin + 95, yPos);
-    doc.text("Berth Pref.", leftMargin + 120, yPos);
-    doc.setFont(undefined, 'normal');
-    yPos += lineSpacing;
-
-    if (booking.passengersList && booking.passengersList.length > 0) {
-      booking.passengersList.forEach((p, index) => {
-        if (yPos > 270) { doc.addPage(); yPos = 20; } // Page break
-        doc.text(`${index + 1}.`, leftMargin, yPos);
-        doc.text(p.name, leftMargin + 15, yPos);
-        doc.text(String(p.age), leftMargin + 80, yPos);
-        doc.text(p.gender.charAt(0).toUpperCase() + p.gender.slice(1), leftMargin + 95, yPos);
-        doc.text(p.preferredBerth.replace(/_/g, ' ').split(' ').map(w=>w.charAt(0).toUpperCase() + w.slice(1)).join(' '), leftMargin + 120, yPos);
-        yPos += lineSpacing;
-      });
-    } else { // Fallback for older bookings without passengersList
-        if (yPos > 270) { doc.addPage(); yPos = 20; }
-        doc.text("Passenger details not itemized (legacy booking).", leftMargin + 15, yPos);
-        yPos += lineSpacing;
-        booking.seats.forEach((seat, index) => {
-            if (yPos > 270) { doc.addPage(); yPos = 20; }
-             doc.text(`${index + 1}.`, leftMargin, yPos);
-             doc.text(`Seat: ${seat}`, leftMargin + 15, yPos);
-             yPos += lineSpacing;
-        });
-    }
-    yPos += sectionSpacing - lineSpacing;
-    doc.line(leftMargin, yPos - (sectionSpacing / 2), rightMargin, yPos - (sectionSpacing / 2));
-
-    // Fare Details
-    doc.setFontSize(14);
-    doc.setFont(undefined, 'bold');
-    doc.text("Fare Details", leftMargin, yPos);
-    doc.setFont(undefined, 'normal');
-    yPos += lineSpacing + 2;
-    
+    doc.text("WL", margin, yPos);
     doc.setFontSize(12);
-    doc.setFont(undefined, 'bold');
-    doc.text("Total Price:", leftMargin, yPos);
-    doc.setFont(undefined, 'normal');
-    doc.text(`INR ${booking.totalPrice.toFixed(2)}`, contentStartMargin, yPos);
-    yPos += sectionSpacing + 5;
-
-
-    // Footer
+    doc.setFont('helvetica', 'bold');
+    doc.text("Electronic Reservation Slip (ERS)", pageWidth / 2, yPos, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.text("Thank you for choosing Indian Rail Connect! Happy Journey!", pageWidth / 2, yPos, { align: "center" });
-    yPos += lineSpacing;
+    doc.text("Normal User", pageWidth / 2 + doc.getTextWidth("Electronic Reservation Slip (ERS)")/2 + 5 , yPos);
+    doc.text("WL", pageWidth - margin - doc.getTextWidth("WL"), yPos);
+    yPos += 25;
+
+    // Booked From / Boarding At / To
+    const journeyBlockYStart = yPos;
     doc.setFontSize(8);
-    doc.text("This is a computer-generated ticket and does not require a signature.", pageWidth / 2, yPos, { align: "center" });
+    doc.setTextColor(100); // Gray
+    doc.text("Booked from", margin, yPos);
+    yPos += 12;
+    doc.setFontSize(10);
+    doc.setTextColor(0); // Black
+    doc.text(booking.origin.toUpperCase(), margin, yPos);
+    yPos += 12;
+    doc.setFontSize(8);
+    doc.text(`Start Date* ${format(parseISO(booking.travelDate + "T00:00:00"), "dd-MMM-yyyy")}`, margin, yPos);
+
+    yPos = journeyBlockYStart; // Reset yPos for middle column
+    const boardingAtX = margin + contentWidth / 3 + 10;
+    const boardingAtWidth = contentWidth / 3 - 20;
+    doc.setFillColor(66, 133, 244); // Blue background for Boarding At
+    doc.rect(boardingAtX - 5, yPos - 10, boardingAtWidth + 10, 38, 'F');
+    doc.setFontSize(10);
+    doc.setTextColor(255); // White
+    doc.setFont('helvetica', 'bold');
+    doc.text("Boarding At", boardingAtX, yPos);
+    yPos += 12;
+    doc.setFontSize(10);
+    doc.text(booking.origin.toUpperCase(), boardingAtX, yPos); // Assuming boarding at origin
+    yPos += 12;
+    doc.setFontSize(8);
+    doc.text(`Departure* ${booking.departureTime} ${format(parseISO(booking.travelDate + "T00:00:00"), "dd-MMM-yyyy")}`, boardingAtX, yPos);
+
+    yPos = journeyBlockYStart; // Reset yPos for right column
+    const toX = margin + (contentWidth / 3) * 2 + 20;
+    doc.setFontSize(8);
+    doc.setTextColor(100); // Gray
+    doc.text("To", toX, yPos);
+    yPos += 12;
+    doc.setFontSize(10);
+    doc.setTextColor(0); // Black
+    doc.text(booking.destination.toUpperCase(), toX, yPos);
+    yPos += 12;
+    doc.setFontSize(8);
+    // Arrival date might be next day
+    const arrivalDate = new Date(parseISO(booking.travelDate + "T00:00:00"));
+    if (parseInt(booking.arrivalTime.split(':')[0]) < parseInt(booking.departureTime.split(':')[0])) {
+        arrivalDate.setDate(arrivalDate.getDate() + 1);
+    }
+    doc.text(`Arrival* ${booking.arrivalTime} ${format(arrivalDate, "dd-MMM-yyyy")}`, toX, yPos);
+    yPos += 20; // Space after journey block
+    doc.setDrawColor(200);
+    doc.line(margin, yPos, pageWidth - margin, yPos); // Horizontal line
+    yPos += 15;
+
+    // PNR, Train, Quota, Class, Distance, Booking Date
+    const infoBlockYStart = yPos;
+    function drawInfoItem(label: string, value: string, x: number, currentY: number, isValueBold = false, valueColor = 0) {
+      doc.setFontSize(8); doc.setTextColor(100);
+      doc.text(label, x, currentY);
+      doc.setFontSize(10); doc.setTextColor(valueColor);
+      doc.setFont('helvetica', isValueBold ? 'bold' : 'normal');
+      doc.text(value, x, currentY + 12);
+      doc.setFont('helvetica', 'normal');
+    }
+
+    drawInfoItem("PNR", booking.pnr || "N/A", margin, yPos, true, doc.getFont().fontName === 'helvetica-bold' ? 0 : 66); // Blue if bold possible
+    drawInfoItem("Train No./Name", `${booking.trainNumber}/${booking.trainName}`, margin + contentWidth / 3, yPos, true, 66);
+    drawInfoItem("Class", booking.selectedClass.toUpperCase(), margin + (contentWidth / 3) * 2, yPos, true, 66);
+    yPos += 30;
+    drawInfoItem("Quota", booking.quota || "N/A", margin, yPos);
+    drawInfoItem("Distance", booking.distance || "N/A", margin + contentWidth / 3, yPos);
+    drawInfoItem("Booking Date", format(parseISO(booking.bookingDate), "dd-MMM-yyyy HH:mm:ss 'HRS'"), margin + (contentWidth / 3) * 2, yPos);
+    yPos += 30;
+    doc.line(margin, yPos, pageWidth - margin, yPos); // Horizontal line
+    yPos += 10;
+
+    // Passenger Details
+    doc.setFontSize(10); doc.setTextColor(0); doc.setFont('helvetica', 'bold');
+    doc.text("Passenger Details", margin, yPos);
+    yPos += 15;
+    const passengerHeaderY = yPos;
+    const colWidths = [25, (contentWidth - 25) * 0.35, (contentWidth - 25) * 0.15, (contentWidth - 25) * 0.15, (contentWidth - 25) * 0.20, (contentWidth - 25) * 0.15];
+    let currentX = margin;
+
+    doc.setFontSize(8); doc.setFont('helvetica', 'bold');
+    ["#", "Name", "Age", "Gender", "Booking Status", "Current Status"].forEach((header, i) => {
+      doc.text(header, currentX + (i === 0 ? 0 : 2) , passengerHeaderY);
+      currentX += colWidths[i];
+    });
+    yPos += 5;
+    doc.line(margin, yPos, pageWidth - margin, yPos); // Line under passenger headers
+    yPos += 10;
+
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+    booking.passengersList.forEach((p, index) => {
+      currentX = margin;
+      doc.text(`${index + 1}.`, currentX, yPos); currentX += colWidths[0];
+      doc.text(p.name.toUpperCase(), currentX, yPos); currentX += colWidths[1];
+      doc.text(String(p.age), currentX, yPos); currentX += colWidths[2];
+      doc.text(p.gender.charAt(0).toUpperCase(), currentX, yPos); currentX += colWidths[3];
+      doc.text(p.bookingStatus || 'N/A', currentX, yPos); currentX += colWidths[4];
+      doc.text(p.currentStatus || 'N/A', currentX, yPos);
+      yPos += 15;
+    });
+    yPos += 5;
+    // Acronyms (simplified)
+    doc.setFontSize(7); doc.setTextColor(100);
+    doc.text("Acronyms: RLWL: REMOTE LOCATION WAITLIST, PQWL: POOLED QUOTA WAITLIST, RSWL: ROADSIDE WAITLIST", margin, yPos, { maxWidth: contentWidth });
+    yPos += 20;
+    doc.line(margin, yPos, pageWidth - margin, yPos); // Horizontal line
+    yPos += 10;
+
+    // Transaction ID
+    doc.setFontSize(9); doc.setTextColor(0);
+    doc.text(`Transaction ID: ${booking.transactionId || 'N/A'}`, margin, yPos);
+    yPos += 12;
+    doc.setFontSize(8); doc.setTextColor(100);
+    doc.text("IR recovers only 57% of cost of travel on an average.", margin, yPos);
+    yPos += 15;
+
+    // Payment Details
+    doc.setFontSize(10); doc.setTextColor(0); doc.setFont('helvetica', 'bold');
+    doc.text("Payment Details", margin, yPos);
+    yPos += 15;
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+    const paymentXLabel = margin;
+    const paymentXValue = margin + contentWidth - 100; // For right-aligning values
+
+    function drawPaymentItem(label: string, value: number | undefined) {
+        doc.text(label, paymentXLabel, yPos);
+        if (value !== undefined) {
+            doc.text(`₹ ${value.toFixed(2)}`, paymentXValue, yPos, { align: 'right'});
+        } else {
+            doc.text("N/A", paymentXValue, yPos, { align: 'right'});
+        }
+        yPos += 15;
+    }
+    drawPaymentItem("Ticket Fare", booking.ticketFare);
+    drawPaymentItem("IRCTC Convenience Fee (Incl of GST)", booking.convenienceFee);
+    doc.setFont('helvetica', 'bold');
+    drawPaymentItem("Total Fare (all inclusive)", booking.totalPrice);
+    doc.setFont('helvetica', 'normal');
+    yPos += 5;
+    doc.setFontSize(8); doc.setTextColor(100);
+    doc.text("PG Charges as applicable (Additional)", margin, yPos);
+    yPos += 20;
+    doc.line(margin, yPos, pageWidth - margin, yPos); // Horizontal line
+    yPos += 10;
+
+    // Important Notes
+    doc.setFontSize(8); doc.setTextColor(0);
+    const notes = [
+        "IRCTC Convenience Fee is charged per e-ticket irrespective of number of passengers on the ticket.",
+        "* The printed Departure and Arrival Times are liable to change. Please Check correct departure, arrival from Railway Station Enquiry or Dial 139 or SMS RAIL to 139.",
+        "This ticket is booked on a personal User ID, its sale/purchase is an offence u/s 143 of the Railways Act, 1989.",
+        "Prescribed original ID proof is required while travelling along with SMS/ VRM/ ERS otherwise will be treated as without ticket and penalized as per Railway Rules."
+    ];
+    notes.forEach(note => {
+        const splitText = doc.splitTextToSize(note, contentWidth);
+        doc.text(splitText, margin, yPos);
+        yPos += (splitText.length * 10) + 2;
+    });
+    yPos += 10;
+    doc.line(margin, yPos, pageWidth - margin, yPos); // Horizontal line
+    yPos += 10;
+
+    // GST Details (Simplified)
+    doc.setFontSize(10); doc.setTextColor(0); doc.setFont('helvetica', 'bold');
+    doc.text("Indian Railways GST Details:", margin, yPos);
+    yPos += 15;
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+    if (booking.gstDetails) {
+        const gst = booking.gstDetails;
+        doc.text(`Invoice Number: ${gst.invoiceNumber || 'N/A'}`, margin, yPos);
+        doc.text(`Address: ${gst.supplierAddress || 'N/A'}`, margin + contentWidth / 2, yPos);
+        yPos += 15;
+        doc.text("Supplier Information:", margin, yPos); yPos += 15;
+        doc.text(`SAC Code: ${gst.supplierSacCode || 'N/A'}`, margin + 10, yPos);
+        doc.text(`GSTIN: ${gst.supplierGstin || 'N/A'}`, margin + contentWidth / 2, yPos);
+        yPos += 15;
+        // ... more GST details can be added if needed.
+    } else {
+        doc.text("GST Details not available.", margin, yPos);
+    }
+    yPos += 20;
 
 
     doc.save(`IndianRailConnect-Ticket-${booking.id}.pdf`);
@@ -248,6 +336,11 @@ export default function ManageBookingPage() {
     );
   }
 
+  // Format travel date for display
+  const travelDateDisplay = booking.travelDate ? format(parseISO(booking.travelDate + "T00:00:00"), "PPP") : "N/A";
+  const bookingDateDisplay = booking.bookingDate ? format(parseISO(booking.bookingDate), "PPpp") : "N/A";
+
+
   return (
     <ClientAuthGuard>
       <div className="max-w-3xl mx-auto space-y-8">
@@ -262,7 +355,7 @@ export default function ManageBookingPage() {
                         <Ticket className="mr-3 h-7 w-7 text-primary" />
                         Manage Your Booking
                     </CardTitle>
-                    <CardDescription>Booking ID: {booking.id}</CardDescription>
+                    <CardDescription>Booking ID: {booking.id} (PNR: {booking.pnr || 'N/A'})</CardDescription>
                 </div>
                 {booking.status === 'upcoming' && <span className="mt-2 sm:mt-0 px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700">Upcoming</span>}
                 {booking.status === 'completed' && <span className="mt-2 sm:mt-0 px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700">Completed</span>}
@@ -281,7 +374,7 @@ export default function ManageBookingPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                     <p className="text-sm text-muted-foreground flex items-center"><CalendarDays className="mr-2 h-4 w-4" /> Travel Date</p>
-                    <p className="font-medium">{new Date(booking.travelDate + "T00:00:00").toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                    <p className="font-medium">{travelDateDisplay}</p>
                 </div>
                  <div>
                     <p className="text-sm text-muted-foreground">Departure - Arrival</p>
@@ -290,6 +383,14 @@ export default function ManageBookingPage() {
                 <div>
                     <p className="text-sm text-muted-foreground">Class</p>
                     <p className="font-medium">{booking.selectedClass.toUpperCase()}</p>
+                </div>
+                 <div>
+                    <p className="text-sm text-muted-foreground">Distance</p>
+                    <p className="font-medium">{booking.distance || 'N/A'}</p>
+                </div>
+                 <div>
+                    <p className="text-sm text-muted-foreground">Quota</p>
+                    <p className="font-medium">{booking.quota || 'N/A'}</p>
                 </div>
                 <div>
                     <p className="text-sm text-muted-foreground flex items-center"><DollarSign className="mr-1 h-4 w-4 text-green-600" />Total Price</p>
@@ -304,7 +405,11 @@ export default function ManageBookingPage() {
                 {booking.passengersList && booking.passengersList.length > 0 ? (
                     <ul className="list-disc list-inside pl-4 space-y-1 text-sm">
                         {booking.passengersList.map((p, index) => (
-                            <li key={index}>{p.name} (Age: {p.age}, Gender: {p.gender.charAt(0).toUpperCase() + p.gender.slice(1)}, Berth: {p.preferredBerth.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')})</li>
+                            <li key={index}>
+                                {p.name} (Age: {p.age}, Gender: {p.gender.charAt(0).toUpperCase() + p.gender.slice(1)}, Berth: {p.preferredBerth.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')})
+                                <br/>
+                                <span className="text-xs text-muted-foreground">Booking: {p.bookingStatus || 'N/A'} | Current: {p.currentStatus || 'N/A'}</span>
+                            </li>
                         ))}
                     </ul>
                 ) : (
@@ -316,7 +421,7 @@ export default function ManageBookingPage() {
                 )}
             </div>
              <Separator />
-             <p className="text-xs text-muted-foreground">Booked on: {new Date(booking.bookingDate).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+             <p className="text-xs text-muted-foreground">Booked on: {bookingDateDisplay} (Transaction ID: {booking.transactionId || 'N/A'})</p>
           </CardContent>
           {booking.status === 'upcoming' && (
             <CardFooter className="bg-muted/30 p-6 border-t flex flex-col sm:flex-row gap-3 justify-end">
@@ -346,5 +451,3 @@ export default function ManageBookingPage() {
     </ClientAuthGuard>
   );
 }
-
-    
