@@ -11,6 +11,13 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Hash, DollarSign, MapPin, Info, Loader2 } from 'lucide-react';
 import { format, getMonth, getYear, parseISO } from 'date-fns';
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from '@/components/ui/chart';
 
 interface MonthlyBookingData {
   month: string;
@@ -22,10 +29,25 @@ interface MonthlySpendingData {
   amount: number;
 }
 
-interface StationFrequency {
-  station: string;
-  count: number;
-}
+// interface StationFrequency { // Not used in current implementation
+//   station: string;
+//   count: number;
+// }
+
+const tripsChartConfig = {
+  bookings: {
+    label: "Trips",
+    color: "hsl(var(--primary))",
+  },
+} satisfies ChartConfig;
+
+const spendingChartConfig = {
+  amount: {
+    label: "Spending (₹)",
+    color: "hsl(var(--accent))",
+  },
+} satisfies ChartConfig;
+
 
 export default function AnalyticsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -198,52 +220,24 @@ export default function AnalyticsPage() {
                   </CardTitle>
                   <CardDescription className="text-sm text-muted-foreground">Number of trips taken each month.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  {`\`\`\`chartjs
-                  {
-                    "type": "bar",
-                    "data": {
-                      "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-                      "datasets": [{
-                        "label": "Bookings",
-                        "data": ${JSON.stringify(monthlyBookingsData.map(d => d.bookings))},
-                        "backgroundColor": "hsl(var(--primary))",
-                        "borderColor": "hsl(var(--primary))",
-                        "borderWidth": 1,
-                        "borderRadius": 4
-                      }]
-                    },
-                    "options": {
-                      "responsive": true,
-                      "maintainAspectRatio": false,
-                      "plugins": {
-                        "legend": {
-                          "display": true,
-                          "position": "top",
-                          "labels": { "color": "#1F2937" }
-                        },
-                        "tooltip": {
-                          "enabled": true,
-                          "backgroundColor": "rgba(0,0,0,0.8)",
-                          "titleColor": "#FFFFFF",
-                          "bodyColor": "#FFFFFF",
-                          "cornerRadius": 4
-                        }
-                      },
-                      "scales": {
-                        "x": {
-                          "grid": { "display": false },
-                          "ticks": { "color": "#6B7280" }
-                        },
-                        "y": {
-                          "beginAtZero": true,
-                          "grid": { "borderDash": [3, 3], "color": "#E5E7EB" },
-                          "ticks": { "color": "#6B7280", "stepSize": 1 }
-                        }
-                      }
-                    }
-                  }
-                  \`\`\``}
+                <CardContent className="pt-4">
+                  <ChartContainer config={tripsChartConfig} className="h-[250px] w-full">
+                    <BarChart accessibilityLayer data={monthlyBookingsData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                      <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="month"
+                        tickLine={false}
+                        tickMargin={10}
+                        axisLine={false}
+                      />
+                      <YAxis allowDecimals={false} tickMargin={10} axisLine={false} tickLine={false} />
+                      <ChartTooltip
+                        cursor={false}
+                        content={<ChartTooltipContent indicator="dashed" />}
+                      />
+                      <Bar dataKey="bookings" fill="var(--color-bookings)" radius={4} />
+                    </BarChart>
+                  </ChartContainer>
                 </CardContent>
               </Card>
 
@@ -255,58 +249,30 @@ export default function AnalyticsPage() {
                   </CardTitle>
                   <CardDescription className="text-sm text-muted-foreground">Total amount spent on trips each month.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  {`\`\`\`chartjs
-                  {
-                    "type": "bar",
-                    "data": {
-                      "labels": ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
-                      "datasets": [{
-                        "label": "Spending (₹)",
-                        "data": ${JSON.stringify(monthlySpendingData.map(d => d.amount))},
-                        "backgroundColor": "hsl(var(--accent))",
-                        "borderColor": "hsl(var(--accent))",
-                        "borderWidth": 1,
-                        "borderRadius": 4
-                      }]
-                    },
-                    "options": {
-                      "responsive": true,
-                      "maintainAspectRatio": false,
-                      "plugins": {
-                        "legend": {
-                          "display": true,
-                          "position": "top",
-                          "labels": { "color": "#1F2937" }
-                        },
-                        "tooltip": {
-                          "enabled": true,
-                          "backgroundColor": "rgba(0,0,0,0.8)",
-                          "titleColor": "#FFFFFF",
-                          "bodyColor": "#FFFFFF",
-                          "cornerRadius": 4,
-                          "callbacks": {
-                            "label": "function(context) { return '₹' + context.raw.toFixed(2); }"
-                          }
-                        }
-                      },
-                      "scales": {
-                        "x": {
-                          "grid": { "display": false },
-                          "ticks": { "color": "#6B7280" }
-                        },
-                        "y": {
-                          "beginAtZero": true,
-                          "grid": { "borderDash": [3, 3], "color": "#E5E7EB" },
-                          "ticks": {
-                            "color": "#6B7280",
-                            "callback": "function(value) { return '₹' + (value / 1000) + 'k'; }"
-                          }
-                        }
-                      }
-                    }
-                  }
-                  \`\`\``}
+                <CardContent className="pt-4">
+                   <ChartContainer config={spendingChartConfig} className="h-[250px] w-full">
+                    <BarChart accessibilityLayer data={monthlySpendingData} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                      <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                      <XAxis
+                        dataKey="month"
+                        tickLine={false}
+                        tickMargin={10}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        tickFormatter={(value) => `₹${value}`}
+                        allowDecimals={false}
+                        tickMargin={10}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <ChartTooltip
+                        cursor={false}
+                        content={<ChartTooltipContent indicator="dashed" />}
+                      />
+                      <Bar dataKey="amount" fill="var(--color-amount)" radius={4} />
+                    </BarChart>
+                  </ChartContainer>
                 </CardContent>
               </Card>
             </section>
@@ -316,5 +282,6 @@ export default function AnalyticsPage() {
     </ClientAuthGuard>
   );
 }
+
 
     
