@@ -1,649 +1,316 @@
-
 "use client";
 
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import type { TrainDetailed, Seat } from '@/lib/types';
-import { ChevronRight, CheckCircle, XCircle, DoorOpen } from 'lucide-react';
+import { ChevronRight, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Calendar } from "@/components/ui/calendar";
-import { format, parseISO, startOfMonth, isEqual, isBefore } from 'date-fns';
+import { format, parseISO, startOfMonth, isBefore } from 'date-fns';
 import { MOCK_TRAINS } from '@/lib/mock-data';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
+// --- NEW UI COMPONENT ---
+const BookingStepper = () => (
+    <div className="flex items-center justify-center space-x-2 sm:space-x-4 mb-8">
+        <div className="flex items-center text-sm font-semibold text-primary">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground mr-2">1</span>
+            Seat Selection
+        </div>
+        <div className="flex-1 border-t-2 border-dashed border-border"></div>
+        <div className="flex items-center text-sm text-muted-foreground">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground mr-2">2</span>
+            Passenger Details
+        </div>
+        <div className="flex-1 border-t-2 border-dashed border-border"></div>
+        <div className="flex items-center text-sm text-muted-foreground">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground mr-2">3</span>
+            Payment
+        </div>
+    </div>
+);
 
-interface TrainDetailItemProps {
-  label: string;
-  value: string | undefined;
-}
-
-const TrainDetailItem: React.FC<TrainDetailItemProps> = ({ label, value }) => (
-  <div className="flex justify-between py-2 border-b border-border last:border-b-0">
-    <span className="text-sm text-muted-foreground">{label}</span>
-    <span className="text-sm font-medium">{value || '-'}</span>
-  </div>
+const TrainDetailItem: React.FC<{ label: string; value: string | undefined; }> = ({ label, value }) => (
+    <div className="flex justify-between py-2 border-b border-primary/10 last:border-b-0 group">
+        <span className="text-sm text-muted-foreground">{label}</span>
+        <span className="text-sm font-medium text-foreground group-hover:text-primary transition-colors">{value || '-'}</span>
+    </div>
 );
 
 const berthColors: Record<Seat['type'], string> = {
-  lower: 'bg-yellow-300 border-yellow-400',
-  middle: 'bg-pink-300 border-pink-400', 
-  upper: 'bg-sky-300 border-sky-400',
-  side_lower: 'bg-green-400 border-green-500',
-  side_upper: 'bg-purple-400 border-purple-500',
-  door: 'bg-gray-200 border-gray-300 text-gray-600',
-  aisle: 'bg-transparent',
-  empty: 'bg-transparent border-transparent',
-  legend_title: 'bg-transparent font-bold',
-  legend_item: 'bg-transparent',
-  toilet: 'bg-gray-200 border-gray-300 text-gray-600', // Kept for type, but not used in legend
+    lower: 'bg-yellow-200 border-yellow-300 hover:bg-yellow-300',
+    middle: 'bg-pink-200 border-pink-300 hover:bg-pink-300',
+    upper: 'bg-sky-200 border-sky-300 hover:bg-sky-300',
+    side_lower: 'bg-green-200 border-green-300 hover:bg-green-300',
+    side_upper: 'bg-purple-200 border-purple-300 hover:bg-purple-300',
+    door: 'bg-gray-200 border-gray-300 text-gray-600',
+    aisle: 'bg-transparent',
+    empty: 'bg-transparent border-transparent',
+    legend_title: '', legend_item: '', toilet: '',
 };
 
-const legendData: { type: Seat['type']; label: string; colorClass: string }[] = [
-    { type: 'door', label: 'Door/Entry', colorClass: berthColors.door },
-    { type: 'lower', label: 'Lower Berth', colorClass: berthColors.lower },
-    { type: 'middle', label: 'Middle Berth', colorClass: berthColors.middle },
-    { type: 'upper', label: 'Upper Berth', colorClass: berthColors.upper },
-    { type: 'side_lower', label: 'Side Lower', colorClass: berthColors.side_lower },
-    { type: 'side_upper', label: 'Side Upper', colorClass: berthColors.side_upper },
+const legendData = [
+    { label: 'Lower Berth', colorClass: berthColors.lower },
+    { label: 'Middle Berth', colorClass: berthColors.middle },
+    { label: 'Upper Berth', colorClass: berthColors.upper },
+    { label: 'Side Lower', colorClass: berthColors.side_lower },
+    { label: 'Side Upper', colorClass: berthColors.side_upper },
+    { label: 'Selected', colorClass: 'bg-blue-600 text-white border-blue-700' },
+    { label: 'Booked', colorClass: 'bg-gray-400 border-gray-500' },
 ];
 
-
 export default function TrainSeatAvailabilityPage() {
-  const params = useParams();
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const { toast } = useToast();
+    const params = useParams();
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const { toast } = useToast();
 
-  const trainId = params.trainId as string;
-  const queryOrigin = searchParams.get('origin');
-  const queryDestination = searchParams.get('destination');
-  const queryDateString = searchParams.get('date');
-  const queryClass = searchParams.get('class');
+    const trainId = params.trainId as string;
+    const queryOrigin = searchParams.get('origin');
+    const queryDestination = searchParams.get('destination');
+    const queryDateString = searchParams.get('date');
+    const queryClass = searchParams.get('class');
 
-  const [trainDetails, setTrainDetails] = useState<TrainDetailed | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+    const [trainDetails, setTrainDetails] = useState<TrainDetailed | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [coachLayout, setCoachLayout] = useState<Seat[][]>([]);
+    const [userSelectedSeats, setUserSelectedSeats] = useState<string[]>([]);
+    const MAX_SEATS_SELECTABLE = 6;
 
-  const initialDate = useMemo(() => {
-    try {
-      if (queryDateString) {
-        const parsed = parseISO(queryDateString);
-        if (!isNaN(parsed.valueOf()) && !isBefore(parsed, new Date(new Date().setHours(0,0,0,0)))) {
-          return parsed;
-        }
-      }
-    } catch (e) { /* Invalid date string */ }
-    return new Date(new Date().setHours(0,0,0,0));
-  }, [queryDateString]);
-
-
-  const [currentMonth, setCurrentMonth] = useState<Date>(startOfMonth(initialDate));
-  const [selectedDateForCalendar, setSelectedDateForCalendar] = useState<Date | undefined>(initialDate);
-  const [selectedClass, setSelectedClass] = useState<string>(queryClass || "SL"); // Default to SL or queryClass
-
-  const [coachLayout, setCoachLayout] = useState<Seat[][]>([]);
-  const [userSelectedSeats, setUserSelectedSeats] = useState<string[]>([]); // Stores seat numbers
-  const MAX_SEATS_SELECTABLE = 6;
-
-  const breadcrumbOrigin = queryOrigin || trainDetails?.origin || "Unknown Origin";
-  const breadcrumbDestination = queryDestination || trainDetails?.destination || "Unknown Destination";
-  
-  const currentSelectedDateForURL = useMemo(() => {
-    return selectedDateForCalendar ? format(selectedDateForCalendar, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
-  }, [selectedDateForCalendar]);
-
-
-  useEffect(() => {
-    setIsLoading(true);
-    setTrainDetails(null);
-    setCoachLayout([]); 
-    setUserSelectedSeats([]);
-
-    const timer = setTimeout(() => {
-      const details = MOCK_TRAINS.find(train => train.id === trainId);
-      if (details) {
-        setTrainDetails(details);
-        const availableStandardClasses = ['1A', '2A', '3A', 'SL', '2S'].filter(cls =>
-          details.availableClasses.includes(cls as any)
-        );
-        if (availableStandardClasses.length > 0) {
-          // Ensure selectedClass is one of the available standard classes, or the first if not.
-          if (!availableStandardClasses.includes(selectedClass) && !details.availableClasses.includes(selectedClass as any)) {
-            setSelectedClass(availableStandardClasses[0]);
-          } else if (!availableStandardClasses.includes(selectedClass) && details.availableClasses.includes(selectedClass as any)) {
-            // If selectedClass is in availableClasses but not standardClasses, keep it.
-          } else if (!availableStandardClasses.includes(selectedClass)) {
-             setSelectedClass(availableStandardClasses[0]);
-          }
-        } else if (details.availableClasses.length > 0) {
-           setSelectedClass(details.availableClasses[0])
-        }
-      } else {
-        toast({ title: "Error", description: "Train details not found.", variant: "destructive" });
-      }
-      setIsLoading(false);
-    }, 100);
-
-    return () => clearTimeout(timer);
-  }, [trainId, toast, selectedClass]); // Added selectedClass to re-evaluate if queryClass changes initial selection
-
-
-  const generateAC3TierLayout = useCallback((): Seat[][] => {
-    const ac3Layout: Seat[][] = Array(18).fill(null).map(() => Array(5).fill(null).map(() => ({ id: `empty-${Math.random()}`, status: 'empty', type: 'empty' })));
-    const entryDisplayText = "ENTRY";
-    ac3Layout[0][0] = {id: 'ENTRY_TL_3A', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
-    ac3Layout[0][1] = {id: 'EMPTY_T1_3A', type: 'empty', status: 'empty'};
-    ac3Layout[0][2] = {id: 'EMPTY_T2_3A', type: 'empty', status: 'empty'};
-    ac3Layout[0][3] = {id: 'AISLE_T_3A', type: 'aisle', status: 'aisle'};
-    ac3Layout[0][4] = {id: 'EMPTY_T3_3A', type: 'empty', status: 'empty'};
-
-    ac3Layout[17][0] = {id: 'ENTRY_BL_3A', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
-    ac3Layout[17][1] = {id: 'EMPTY_B1_3A', type: 'empty', status: 'empty'};
-    ac3Layout[17][2] = {id: 'EMPTY_B2_3A', type: 'empty', status: 'empty'};
-    ac3Layout[17][3] = {id: 'AISLE_B_3A', type: 'aisle', status: 'aisle'};
-    ac3Layout[17][4] = {id: 'EMPTY_B3_3A', type: 'empty', status: 'empty'};
-
-    let currentSeatNum = 1;
-    for (let bay = 0; bay < 8; bay++) {
-        const r1 = bay * 2 + 1; 
-        const r2 = r1 + 1;      
-
-        ac3Layout[r1][0] = { id: `S${currentSeatNum}_3A`, number: `${currentSeatNum}`, type: 'lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac3Layout[r1][1] = { id: `S${currentSeatNum}_3A`, number: `${currentSeatNum}`, type: 'middle', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac3Layout[r1][2] = { id: `S${currentSeatNum}_3A`, number: `${currentSeatNum}`, type: 'upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        
-        ac3Layout[r2][0] = { id: `S${currentSeatNum}_3A`, number: `${currentSeatNum}`, type: 'lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac3Layout[r2][1] = { id: `S${currentSeatNum}_3A`, number: `${currentSeatNum}`, type: 'middle', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac3Layout[r2][2] = { id: `S${currentSeatNum}_3A`, number: `${currentSeatNum}`, type: 'upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-
-        ac3Layout[r1][4] = { id: `S${currentSeatNum}_3A`, number: `${currentSeatNum}`, type: 'side_lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac3Layout[r2][4] = { id: `S${currentSeatNum}_3A`, number: `${currentSeatNum}`, type: 'side_upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        
-        ac3Layout[r1][3] = { id: `AISLE${r1}_3A`, type: 'aisle', status: 'aisle' };
-        ac3Layout[r2][3] = { id: `AISLE${r2}_3A`, type: 'aisle', status: 'aisle' };
-    }
-    
-    for (let i = 0; i < ac3Layout.length; i++) {
-        for (let j = 0; j < ac3Layout[i].length; j++) {
-            const seat = ac3Layout[i][j];
-            if (seat.type && berthColors[seat.type]) {
-                seat.originalColor = berthColors[seat.type];
+    const today = useMemo(() => new Date(new Date().setHours(0, 0, 0, 0)), []);
+    const initialDate = useMemo(() => {
+        try {
+            if (queryDateString) {
+                const parsed = parseISO(queryDateString);
+                if (!isNaN(parsed.valueOf()) && !isBefore(parsed, today)) return parsed;
             }
-        }
-    }
-    return ac3Layout;
-  }, []);
+        } catch (e) { /* Invalid date string */ }
+        return today;
+    }, [queryDateString, today]);
 
-  const generateAC2TierLayout = useCallback((): Seat[][] => {
-    const ac2Layout: Seat[][] = Array(18).fill(null).map(() => Array(5).fill(null).map(() => ({ id: `empty-${Math.random()}`, status: 'empty', type: 'empty' })));
-    const entryDisplayText = "ENTRY";
+    const [currentMonth, setCurrentMonth] = useState<Date>(startOfMonth(initialDate));
+    const [selectedDateForCalendar, setSelectedDateForCalendar] = useState<Date | undefined>(initialDate);
+    const [selectedClass, setSelectedClass] = useState<string>(queryClass || "SL");
 
-    ac2Layout[0][0] = {id: 'ENTRY_TL_2A', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
-    ac2Layout[0][1] = {id: 'EMPTY_T1_2A', type: 'empty', status: 'empty'}; 
-    ac2Layout[0][2] = {id: 'EMPTY_T2_2A', type: 'empty', status: 'empty'};
-    ac2Layout[0][3] = {id: 'AISLE_T_2A', type: 'aisle', status: 'aisle'};
-    ac2Layout[0][4] = {id: 'EMPTY_T3_2A', type: 'empty', status: 'empty'};
+    const breadcrumbOrigin = queryOrigin || trainDetails?.origin || "Unknown Origin";
+    const breadcrumbDestination = queryDestination || trainDetails?.destination || "Unknown Destination";
+    const currentSelectedDateForURL = useMemo(() => format(selectedDateForCalendar || new Date(), 'yyyy-MM-dd'), [selectedDateForCalendar]);
 
-    ac2Layout[17][0] = {id: 'ENTRY_BL_2A', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
-    ac2Layout[17][1] = {id: 'EMPTY_B1_2A', type: 'empty', status: 'empty'}; 
-    ac2Layout[17][2] = {id: 'EMPTY_B2_2A', type: 'empty', status: 'empty'};
-    ac2Layout[17][3] = {id: 'AISLE_B_2A', type: 'aisle', status: 'aisle'};
-    ac2Layout[17][4] = {id: 'EMPTY_B3_2A', type: 'empty', status: 'empty'};
-
-    let currentSeatNum = 1;
-    for (let bay = 0; bay < 8; bay++) {
-        const segment1 = bay * 2 + 1; 
-        const segment2 = segment1 + 1;  
-
-        ac2Layout[segment1][0] = { id: `S${currentSeatNum}_2A`, number: `${currentSeatNum}`, type: 'lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac2Layout[segment1][1] = { id: `S${currentSeatNum}_2A`, number: `${currentSeatNum}`, type: 'upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac2Layout[segment1][2] = { id: `EMPTY_M1_${bay}_2A`, type: 'empty', status: 'empty' }; 
-
-        ac2Layout[segment2][0] = { id: `S${currentSeatNum}_2A`, number: `${currentSeatNum}`, type: 'lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac2Layout[segment2][1] = { id: `S${currentSeatNum}_2A`, number: `${currentSeatNum}`, type: 'upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac2Layout[segment2][2] = { id: `EMPTY_M2_${bay}_2A`, type: 'empty', status: 'empty' }; 
-
-        ac2Layout[segment1][4] = { id: `S${currentSeatNum}_2A`, number: `${currentSeatNum}`, type: 'side_lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac2Layout[segment2][4] = { id: `S${currentSeatNum}_2A`, number: `${currentSeatNum}`, type: 'side_upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        
-        ac2Layout[segment1][3] = { id: `AISLE${segment1}_2A`, type: 'aisle', status: 'aisle' };
-        ac2Layout[segment2][3] = { id: `AISLE${segment2}_2A`, type: 'aisle', status: 'aisle' };
-    }
-    
-    for (let i = 0; i < ac2Layout.length; i++) {
-        for (let j = 0; j < ac2Layout[i].length; j++) {
-            const seat = ac2Layout[i][j];
-            if (seat.type && berthColors[seat.type]) {
-                seat.originalColor = berthColors[seat.type];
-            }
-        }
-    }
-    return ac2Layout;
-  }, []);
-
-  const generateSleeperLayout = useCallback((): Seat[][] => {
-    const slLayout: Seat[][] = Array(18).fill(null).map(() => Array(5).fill(null).map(() => ({ id: `empty-${Math.random()}`, status: 'empty', type: 'empty' })));
-    const entryDisplayText = "ENTRY";
-    slLayout[0][0] = {id: 'ENTRY_TL_SL', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
-    slLayout[0][1] = {id: 'EMPTY_T1_SL', type: 'empty', status: 'empty'};
-    slLayout[0][2] = {id: 'EMPTY_T2_SL', type: 'empty', status: 'empty'};
-    slLayout[0][3] = {id: 'AISLE_T_SL', type: 'aisle', status: 'aisle'};
-    slLayout[0][4] = {id: 'EMPTY_T3_SL', type: 'empty', status: 'empty'};
-
-    slLayout[17][0] = {id: 'ENTRY_BL_SL', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
-    slLayout[17][1] = {id: 'EMPTY_B1_SL', type: 'empty', status: 'empty'};
-    slLayout[17][2] = {id: 'EMPTY_B2_SL', type: 'empty', status: 'empty'};
-    slLayout[17][3] = {id: 'AISLE_B_SL', type: 'aisle', status: 'aisle'};
-    slLayout[17][4] = {id: 'EMPTY_B3_SL', type: 'empty', status: 'empty'};
-
-    let currentSeatNum = 1;
-    for (let bay = 0; bay < 8; bay++) {
-        const r1 = bay * 2 + 1; 
-        const r2 = r1 + 1;      
-
-        slLayout[r1][0] = { id: `S${currentSeatNum}_SL`, number: `${currentSeatNum}`, type: 'lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        slLayout[r1][1] = { id: `S${currentSeatNum}_SL`, number: `${currentSeatNum}`, type: 'middle', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        slLayout[r1][2] = { id: `S${currentSeatNum}_SL`, number: `${currentSeatNum}`, type: 'upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        
-        slLayout[r2][0] = { id: `S${currentSeatNum}_SL`, number: `${currentSeatNum}`, type: 'lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        slLayout[r2][1] = { id: `S${currentSeatNum}_SL`, number: `${currentSeatNum}`, type: 'middle', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        slLayout[r2][2] = { id: `S${currentSeatNum}_SL`, number: `${currentSeatNum}`, type: 'upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-
-        slLayout[r1][4] = { id: `S${currentSeatNum}_SL`, number: `${currentSeatNum}`, type: 'side_lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        slLayout[r2][4] = { id: `S${currentSeatNum}_SL`, number: `${currentSeatNum}`, type: 'side_upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        
-        slLayout[r1][3] = { id: `AISLE${r1}_SL`, type: 'aisle', status: 'aisle' };
-        slLayout[r2][3] = { id: `AISLE${r2}_SL`, type: 'aisle', status: 'aisle' };
-    }
-    
-    for (let i = 0; i < slLayout.length; i++) {
-        for (let j = 0; j < slLayout[i].length; j++) {
-            const seat = slLayout[i][j];
-            if (seat.type && berthColors[seat.type]) {
-                seat.originalColor = berthColors[seat.type];
-            }
-        }
-    }
-    return slLayout;
-  }, []);
-
-  const generateAC1TierLayout = useCallback((): Seat[][] => {
-    const ac1Layout: Seat[][] = Array(18).fill(null).map(() => Array(5).fill(null).map(() => ({ id: `empty-${Math.random()}`, status: 'empty', type: 'empty' })));
-    const entryDisplayText = "ENTRY";
-    ac1Layout[0][0] = {id: 'ENTRY_TL_1A', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
-    ac1Layout[0][1] = {id: 'EMPTY_T1_1A', type: 'empty', status: 'empty'};
-    ac1Layout[0][2] = {id: 'EMPTY_T2_1A', type: 'empty', status: 'empty'};
-    ac1Layout[0][3] = {id: 'AISLE_T_1A', type: 'aisle', status: 'aisle'};
-    ac1Layout[0][4] = {id: 'EMPTY_T3_1A', type: 'empty', status: 'empty'};
-
-    ac1Layout[17][0] = {id: 'ENTRY_BL_1A', displayText: entryDisplayText, type: 'door', status: 'unavailable'};
-    ac1Layout[17][1] = {id: 'EMPTY_B1_1A', type: 'empty', status: 'empty'};
-    ac1Layout[17][2] = {id: 'EMPTY_B2_1A', type: 'empty', status: 'empty'};
-    ac1Layout[17][3] = {id: 'AISLE_B_1A', type: 'aisle', status: 'aisle'};
-    ac1Layout[17][4] = {id: 'EMPTY_B3_1A', type: 'empty', status: 'empty'};
-
-    let currentSeatNum = 1;
-    for (let bay = 0; bay < 8; bay++) {
-        const r1 = bay * 2 + 1; 
-        const r2 = r1 + 1;      
-
-        ac1Layout[r1][0] = { id: `S${currentSeatNum}_1A`, number: `${currentSeatNum}`, type: 'lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac1Layout[r1][1] = { id: `S${currentSeatNum}_1A`, number: `${currentSeatNum}`, type: 'middle', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac1Layout[r1][2] = { id: `S${currentSeatNum}_1A`, number: `${currentSeatNum}`, type: 'upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        
-        ac1Layout[r2][0] = { id: `S${currentSeatNum}_1A`, number: `${currentSeatNum}`, type: 'lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac1Layout[r2][1] = { id: `S${currentSeatNum}_1A`, number: `${currentSeatNum}`, type: 'middle', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac1Layout[r2][2] = { id: `S${currentSeatNum}_1A`, number: `${currentSeatNum}`, type: 'upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-
-        ac1Layout[r1][4] = { id: `S${currentSeatNum}_1A`, number: `${currentSeatNum}`, type: 'side_lower', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        ac1Layout[r2][4] = { id: `S${currentSeatNum}_1A`, number: `${currentSeatNum}`, type: 'side_upper', status: Math.random() > 0.3 ? 'available' : 'booked' }; currentSeatNum++;
-        
-        ac1Layout[r1][3] = { id: `AISLE${r1}_1A`, type: 'aisle', status: 'aisle' };
-        ac1Layout[r2][3] = { id: `AISLE${r2}_1A`, type: 'aisle', status: 'aisle' };
-    }
-    
-    for (let i = 0; i < ac1Layout.length; i++) {
-        for (let j = 0; j < ac1Layout[i].length; j++) {
-            const seat = ac1Layout[i][j];
-            if (seat.type && berthColors[seat.type]) {
-                seat.originalColor = berthColors[seat.type];
-            }
-        }
-    }
-    return ac1Layout;
-  }, []);
-
-
-  useEffect(() => {
-    if (selectedDateForCalendar && selectedClass && trainDetails) {
-        let layoutToSet: Seat[][] = [];
-        if (selectedClass === "3A") { 
-            layoutToSet = generateAC3TierLayout();
-        } else if (selectedClass === "2A") {
-            layoutToSet = generateAC2TierLayout();
-        } else if (selectedClass === "SL") {
-            layoutToSet = generateSleeperLayout();
-        } else if (selectedClass === "1A") {
-            layoutToSet = generateAC1TierLayout();
-        } else { 
-            const rows = 10; 
-            const seatsVisualPerRow = 6; 
-            const newLayout: Seat[][] = [];
-            for (let r = 0; r < rows; r++) {
-                const rowSeats: Seat[] = [];
-                for (let s = 0; s < seatsVisualPerRow; s++) {
-                  const seatId = `${selectedClass}-R${r}S${s}`;
-                  const seatNumber = `${String.fromCharCode(65 + r)}${s + 1}`;
-                  let type: Seat['type'] = 'middle'; 
-                  if (s === 0 || s === seatsVisualPerRow -1 ) type = 'lower'; 
-                  else if (s === 1 || s === seatsVisualPerRow -2) type = 'upper'; 
-                  else if (s === 2 || s === 3) type = 'aisle'; 
-
-                  rowSeats.push({
-                      id: seatId, number: seatNumber, status: Math.random() > 0.7 ? 'booked' : 'available', type: type,
-                      originalColor: berthColors.middle 
-                  });
+    useEffect(() => {
+        setIsLoading(true);
+        setTimeout(() => {
+            const details = MOCK_TRAINS.find(train => train.id === trainId);
+            if (details) {
+                setTrainDetails(details);
+                const standardClasses = ['1A', '2A', '3A', 'SL', '2S'];
+                const availableStandardClasses = standardClasses.filter(cls => details.availableClasses.includes(cls as any));
+                if (!availableStandardClasses.includes(selectedClass)) {
+                    setSelectedClass(availableStandardClasses[0] || details.availableClasses[0] || 'SL');
                 }
-                newLayout.push(rowSeats);
-            }
-            layoutToSet = newLayout;
-        }
-        setCoachLayout(layoutToSet);
-        setUserSelectedSeats([]); 
-    } else {
-        setCoachLayout([]); 
-    }
-  }, [selectedDateForCalendar, selectedClass, trainDetails, generateAC3TierLayout, generateAC2TierLayout, generateSleeperLayout, generateAC1TierLayout]);
-
-
-  const handleSeatClick = (seatId: string, seatNumber?: string, currentStatus?: Seat['status']) => {
-    if (!seatNumber || currentStatus === 'booked' || currentStatus === 'unavailable' || currentStatus === 'aisle' || currentStatus === 'empty' || currentStatus === 'info') return;
-
-    let newSelectedSeats = [...userSelectedSeats];
-    const newLayout = coachLayout.map(row =>
-      row.map(seat => {
-        if (seat.id === seatId && seat.number) {
-          if (seat.status === 'available') {
-            if (userSelectedSeats.length < MAX_SEATS_SELECTABLE) {
-              newSelectedSeats.push(seat.number); 
-              return { ...seat, status: 'selected' as const };
             } else {
-              toast({ title: "Selection Limit Reached", description: `You can select a maximum of ${MAX_SEATS_SELECTABLE} seats.`, variant: "default" });
+                toast({ title: "Error", description: "Train details not found.", variant: "destructive" });
             }
-          } else if (seat.status === 'selected') {
-            newSelectedSeats = newSelectedSeats.filter(num => num !== seat.number);
-            return { ...seat, status: 'available' as const };
-          }
+            setIsLoading(false);
+        }, 100);
+    }, [trainId, toast]);
+
+    const createLayoutGrid = (rows: number, cols: number): Seat[][] =>
+        Array(rows).fill(null).map(() => Array(cols).fill({ id: `empty-${Math.random()}`, status: 'empty', type: 'empty' }));
+
+    const generateBerthLayout = useCallback((rows: number, bays: number, hasMiddle: boolean, hasSide: boolean, classSuffix: string): Seat[][] => {
+        const layout = createLayoutGrid(rows, 5);
+        let seatNum = 1;
+        const makeSeat = (type: Seat['type']): Seat => ({ id: `S${seatNum}_${classSuffix}`, number: `${seatNum++}`, type, status: Math.random() > 0.3 ? 'available' : 'booked' });
+
+        for (let bay = 0; bay < bays; bay++) {
+            const r1 = bay * 2 + 1, r2 = r1 + 1;
+            if (r2 >= rows - 1) break;
+
+            layout[r1][3] = { id: `AISLE${r1}_${classSuffix}`, type: 'aisle', status: 'aisle' };
+            layout[r2][3] = { id: `AISLE${r2}_${classSuffix}`, type: 'aisle', status: 'aisle' };
+            
+            layout[r1][0] = makeSeat('lower');
+            if (hasMiddle) layout[r1][1] = makeSeat('middle');
+            layout[r1][2] = makeSeat('upper');
+            
+            layout[r2][0] = makeSeat('lower');
+            if (hasMiddle) layout[r2][1] = makeSeat('middle');
+            layout[r2][2] = makeSeat('upper');
+            
+            if (hasSide) {
+                layout[r1][4] = makeSeat('side_lower');
+                layout[r2][4] = makeSeat('side_upper');
+            }
         }
-        return seat;
-      })
-    );
-    setCoachLayout(newLayout);
-    setUserSelectedSeats(newSelectedSeats);
-  };
+        return layout;
+    }, []);
 
-  const handleDateSelect = (date: Date | undefined) => {
-    if (date) {
-      if (isBefore(date, new Date(new Date().setHours(0,0,0,0)))) {
-        toast({ title: "Invalid Date", description: "Cannot select a past date.", variant: "destructive"});
-        return;
-      }
-      setSelectedDateForCalendar(date);
-      const newURL = `/trains/${trainId}/seats?origin=${encodeURIComponent(breadcrumbOrigin)}&destination=${encodeURIComponent(breadcrumbDestination)}&date=${format(date, 'yyyy-MM-dd')}&class=${selectedClass}`;
-      window.history.pushState({}, '', newURL);
-      setCurrentMonth(startOfMonth(date));
-      toast({ title: "Date Selected", description: `Showing availability for ${format(date, "PPP")}` });
+    const generateAC3TierLayout = useCallback(() => generateBerthLayout(18, 8, true, true, '3A'), [generateBerthLayout]);
+    const generateSleeperLayout = useCallback(() => generateBerthLayout(18, 9, true, true, 'SL'), [generateBerthLayout]);
+    const generateAC2TierLayout = useCallback(() => generateBerthLayout(18, 8, false, true, '2A'), [generateBerthLayout]);
+
+    const generateAC1TierLayout = useCallback((): Seat[][] => {
+        const layout = createLayoutGrid(18, 3);
+        let seatNum = 1;
+        const makeSeat = (type: Seat['type']): Seat => ({ id: `S${seatNum}_1A`, number: `${seatNum++}`, type, status: Math.random() > 0.3 ? 'available' : 'booked' });
+        
+        for (let i = 0; i < 18; i++) layout[i][1] = { id: `AISLE${i}_1A`, type: 'aisle', status: 'aisle' };
+        
+        // Coupes (2 berths) & Cabins (4 berths)
+        const placements = [1, 3, 4, 6, 7, 9, 11, 12, 14, 15]; // Example row placements
+        placements.forEach(row => {
+            layout[row][0] = makeSeat('lower');
+            layout[row][2] = makeSeat('upper');
+        });
+        return layout;
+    }, []);
+
+    useEffect(() => {
+        if (selectedDateForCalendar && selectedClass && trainDetails) {
+            const layoutGenerators: Record<string, () => Seat[][]> = {
+                "1A": generateAC1TierLayout, "2A": generateAC2TierLayout,
+                "3A": generateAC3TierLayout, "SL": generateSleeperLayout,
+            };
+            setCoachLayout(layoutGenerators[selectedClass]?.() || []);
+            setUserSelectedSeats([]);
+        }
+    }, [selectedDateForCalendar, selectedClass, trainDetails, generateAC1TierLayout, generateAC2TierLayout, generateAC3TierLayout, generateSleeperLayout]);
+
+    const handleSeatClick = (seat: Seat) => {
+        if (!seat.number || !['available', 'selected'].includes(seat.status)) return;
+        
+        const isSelected = userSelectedSeats.includes(seat.number);
+        if (!isSelected && userSelectedSeats.length >= MAX_SEATS_SELECTABLE) {
+            toast({ title: "Selection Limit Reached", description: `You can select a maximum of ${MAX_SEATS_SELECTABLE} seats.` });
+            return;
+        }
+
+        setUserSelectedSeats(current => isSelected ? current.filter(s => s !== seat.number) : [...current, seat.number]);
+        setCoachLayout(layout => layout.map(row => row.map(s => s.id === seat.id ? { ...s, status: isSelected ? 'available' : 'selected' } : s)));
+    };
+
+    const handleDateOrClassChange = (value: Date | string) => {
+        const newDate = value instanceof Date ? value : selectedDateForCalendar;
+        const newClass = typeof value === 'string' ? value : selectedClass;
+        
+        if (newDate && isBefore(newDate, today)) {
+            toast({ title: "Invalid Date", description: "Cannot select a past date.", variant: "destructive" });
+            return;
+        }
+
+        if (newDate) setSelectedDateForCalendar(newDate);
+        if (typeof value === 'string') setSelectedClass(newClass);
+
+        const newUrl = `/trains/${trainId}/seats?origin=${encodeURIComponent(breadcrumbOrigin)}&destination=${encodeURIComponent(breadcrumbDestination)}&date=${format(newDate || new Date(), 'yyyy-MM-dd')}&class=${newClass}`;
+        router.push(newUrl, { scroll: false });
+    };
+
+    if (isLoading) {
+        return <div className="flex justify-center items-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
     }
-  };
-  
-  const handleClassChange = (newClass: string) => {
-    setSelectedClass(newClass);
-    const newURL = `/trains/${trainId}/seats?origin=${encodeURIComponent(breadcrumbOrigin)}&destination=${encodeURIComponent(breadcrumbDestination)}&date=${currentSelectedDateForURL}&class=${newClass}`;
-    window.history.pushState({}, '', newURL);
-  };
+    if (!trainDetails) {
+        return <div className="text-center py-10">Train details not found.</div>;
+    }
 
+    const standardClasses = ['1A', '2A', '3A', 'SL', '2S'];
 
-  if (isLoading) {
-    return <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">Loading train details...</div>;
-  }
+    return (
+        <div className="bg-gradient-to-b from-slate-50 to-white min-h-screen">
+            <div className="container mx-auto px-4 py-8 space-y-8">
+                <BookingStepper />
 
-  if (!trainDetails) {
-    return <div className="text-center py-10">Train details not found. Please check the train ID or try again later.</div>;
-  }
+                <Card className="bg-white/90 backdrop-blur-sm shadow-lg border border-primary/10">
+                    <CardHeader>
+                        <CardTitle className="text-2xl">Train & Route</CardTitle>
+                        <CardDescription>{breadcrumbOrigin} to {breadcrumbDestination}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <TrainDetailItem label="Train Name" value={trainDetails.trainName} />
+                        <TrainDetailItem label="Train Number" value={trainDetails.trainNumber} />
+                    </CardContent>
+                </Card>
 
-  const standardClasses = ['1A', '2A', '3A', 'SL', '2S'];
-  const displayableClasses = standardClasses.filter(cls => trainDetails.availableClasses.includes(cls as any));
-  if (!displayableClasses.includes(selectedClass) && trainDetails.availableClasses.includes(selectedClass as any)) {
-    displayableClasses.push(selectedClass); 
-  } else if (displayableClasses.length === 0 && trainDetails.availableClasses.length > 0) {
-    displayableClasses.push(...trainDetails.availableClasses as string[]);
-  }
-
-
-  return (
-    <div className="container mx-auto px-4 py-8 space-y-8"> 
-      <nav className="text-sm text-muted-foreground flex items-center space-x-2 flex-wrap">
-        <Link href="/" className="hover:underline">Train Search</Link>
-        <ChevronRight size={16} />
-        <Link href={`/?origin=${encodeURIComponent(breadcrumbOrigin)}&destination=${encodeURIComponent(breadcrumbDestination)}&date=${currentSelectedDateForURL}`} className="hover:underline">
-          {breadcrumbOrigin.split('(')[0].trim()} to {breadcrumbDestination.split('(')[0].trim()}
-        </Link>
-        <ChevronRight size={16} />
-        <span className="font-medium text-foreground">{trainDetails.trainName} ({trainDetails.trainNumber})</span>
-      </nav>
-
-      <h1 className="text-3xl font-bold">Train Seat Availability</h1>
-
-      <section>
-        <Card className="shadow-none border">
-          <CardHeader>
-            <CardTitle className="text-xl">Train Details</CardTitle>
-          </CardHeader>
-          <CardContent className="p-4 space-y-1">
-            <TrainDetailItem label="Train Name" value={trainDetails.trainName} />
-            <TrainDetailItem label="Train Number" value={trainDetails.trainNumber} />
-          </CardContent>
-        </Card>
-      </section>
-
-      <section>
-        <Tabs value={selectedClass} onValueChange={handleClassChange} className="w-full">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 mb-4">
-            {standardClasses.map(cls => (
-              <TabsTrigger
-                key={cls}
-                value={cls}
-                disabled={!trainDetails.availableClasses.includes(cls as any)}
-              >
-                {cls}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
-        {displayableClasses.includes(selectedClass) && (
-          <TabsContent value={selectedClass} forceMount>
-            <Card className="shadow-none border">
-                <CardHeader>
-                    <CardTitle className="text-xl">Availability for Class: <span className="text-primary">{selectedClass}</span> on <span className="text-primary">{selectedDateForCalendar ? format(selectedDateForCalendar, "PPP") : "N/A"}</span></CardTitle>
-                </CardHeader>
-              <CardContent className="p-4">
-                <Calendar
-                  mode="single"
-                  selected={selectedDateForCalendar}
-                  onSelect={handleDateSelect}
-                  month={currentMonth}
-                  onMonthChange={setCurrentMonth}
-                  numberOfMonths={1} 
-                  className="rounded-md border mb-6"
-                  disabled={(date) => isBefore(date, new Date(new Date().setDate(new Date().getDate() -1)))}
-                />
-
-                <div className="mb-4 p-3 border rounded-md bg-muted/30">
-                    <h4 className="text-md font-semibold mb-2">Legends</h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-                        {legendData.map(legend => (
-                            <div key={legend.label} className="flex items-center">
-                                <span className={cn("inline-block w-3 h-3 mr-2 rounded-sm border", legend.colorClass)}></span>
-                                <span>{legend.label}</span>
-                            </div>
+                <Tabs value={selectedClass} onValueChange={handleDateOrClassChange} className="w-full">
+                    <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 mb-4 bg-primary/10 rounded-lg p-1">
+                        {standardClasses.map(cls => (
+                            <TabsTrigger key={cls} value={cls} disabled={!trainDetails.availableClasses.includes(cls as any)}
+                                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                                {cls}
+                            </TabsTrigger>
                         ))}
-                         <div className="flex items-center">
-                            <span className="inline-block w-3 h-3 bg-blue-600 border-blue-700 mr-1 rounded-sm"></span> Selected
-                        </div>
-                        <div className="flex items-center">
-                            <span className="inline-block w-3 h-3 bg-gray-400 border-gray-500 mr-1 rounded-sm"></span> Booked
-                        </div>
-                    </div>
-                </div>
+                    </TabsList>
 
-
-                {coachLayout.length > 0 && (selectedClass === "1A" || selectedClass === "3A" || selectedClass === "2A" || selectedClass === "SL") ? (
-                  <div className="mt-6">
-                    <h3 className="text-lg font-semibold mb-3 text-center">{selectedClass} Coach Layout (Horizontal)</h3>
-                     <div className="flex flex-row overflow-x-auto p-2 border rounded-md bg-muted/10 space-x-0.5 min-h-[200px]"> 
-                        {coachLayout.map((segmentSeats, segmentIndex) => (
-                            <div key={`segment-${segmentIndex}-${selectedClass}`} className="flex flex-col space-y-0.5 items-center">
-                                {segmentSeats.map((seat) => {
-                                    const seatBaseColor = seat.originalColor || berthColors[seat.type] || 'bg-gray-100';
-                                    let displayColor = seatBaseColor;
-                                    if (seat.status === 'selected') displayColor = 'bg-blue-600 text-white border-blue-700';
-                                    else if (seat.status === 'booked') displayColor = 'bg-gray-400 text-gray-700 border-gray-500 cursor-not-allowed';
-                                    else if (seat.status === 'unavailable') displayColor = cn(berthColors[seat.type] || 'bg-gray-200', 'cursor-not-allowed opacity-80');
-                                    
-                                    const isSeatClickable = seat.number && seat.status !== 'booked' && seat.status !== 'unavailable' && seat.status !== 'aisle' && seat.status !== 'empty';
-                                    
-                                    if (seat.type === 'door') {
-                                        return (
-                                            <div
-                                                key={seat.id}
-                                                className={cn(
-                                                    "w-16 h-10 border rounded text-[10px] flex items-center justify-center font-medium leading-tight p-1",
-                                                    displayColor
-                                                )}
-                                                title={seat.displayText || seat.type}
-                                            >
-                                               {seat.displayText}
-                                            </div>
-                                        );
-                                    }
-                                    if (seat.type === 'aisle') {
-                                        return <div key={seat.id} className="w-16 h-3 my-0.5 bg-gray-100 rounded-sm"></div>; 
-                                    }
-                                    if (seat.type === 'empty') {
-                                         return <div key={seat.id} className="w-16 h-8 border border-transparent"></div>; 
-                                    }
-
-                                    return (
-                                        <div
-                                            key={seat.id}
-                                            onClick={() => isSeatClickable ? handleSeatClick(seat.id, seat.number, seat.status) : null}
-                                            className={cn(
-                                            "w-16 h-8 border rounded text-xs flex items-center justify-center font-medium transition-all",
-                                            displayColor,
-                                            isSeatClickable && seat.status === 'available' && 'hover:ring-2 hover:ring-offset-1 hover:ring-primary cursor-pointer'
-                                            )}
-                                            title={seat.number ? `Seat ${seat.number} (${seat.type.replace('_',' ').toUpperCase()})` : seat.displayText || seat.type}
-                                        >
-                                            {seat.number || ''}
+                    <TabsContent value={selectedClass} forceMount>
+                        <Card className="bg-white/90 backdrop-blur-sm shadow-lg border border-primary/10">
+                            <CardHeader>
+                                <CardTitle>Select Date & Seats</CardTitle>
+                                <CardDescription>
+                                    Availability for <span className="font-semibold text-primary">{selectedClass}</span> on <span className="font-semibold text-primary">{format(selectedDateForCalendar || new Date(), "PPP")}</span>
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="grid md:grid-cols-3 gap-8">
+                                <div className="md:col-span-1 space-y-6">
+                                    <Calendar mode="single" selected={selectedDateForCalendar} onSelect={(d) => d && handleDateOrClassChange(d)} month={currentMonth} onMonthChange={setCurrentMonth} className="rounded-md border shadow-inner bg-muted/20" disabled={(date) => isBefore(date, today)} />
+                                    <div className="p-3 border rounded-md">
+                                        <h4 className="text-sm font-semibold mb-2">Legend</h4>
+                                        <div className="grid grid-cols-2 gap-2 text-xs">
+                                            {legendData.map(item => (
+                                                <div key={item.label} className="flex items-center"><span className={cn("inline-block w-3 h-3 mr-2 rounded-sm border", item.colorClass)}></span>{item.label}</div>
+                                            ))}
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        ))}
-                    </div>
-
-
-                    {userSelectedSeats.length > 0 && (
-                      <div className="mt-6 text-center">
-                        <p className="text-sm mb-2">Selected Seats: <span className="font-semibold">{userSelectedSeats.join(', ')}</span></p>
-                        <Button asChild className="mt-2">
-                          <Link href={`/bookings/passenger-details?trainId=${trainId}&date=${currentSelectedDateForURL}&class=${selectedClass}&origin=${encodeURIComponent(breadcrumbOrigin)}&destination=${encodeURIComponent(breadcrumbDestination)}&selectedSeats=${userSelectedSeats.join(',')}`}>
-                            Proceed ({userSelectedSeats.length} Seat{userSelectedSeats.length > 1 ? 's' : ''})
-                          </Link>
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                ) : coachLayout.length > 0 && selectedClass !== "1A" && selectedClass !== "3A" && selectedClass !== "2A" && selectedClass !== "SL" ? ( 
-                    <div className="mt-6"> 
-                         <h3 className="text-lg font-semibold mb-2">Select Your Seats (Coach: {selectedClass})</h3>
-                         <div className="border p-2 rounded-md bg-muted/20 max-w-md mx-auto">
-                            {coachLayout.map((row, rowIndex) => (
-                            <div key={`row-${rowIndex}-${selectedClass}`} className="grid grid-cols-[repeat(3,minmax(0,1fr))_20px_repeat(3,minmax(0,1fr))] gap-1 mb-1">
-                                {row.slice(0,3).map(seat => (
-                                    <div
-                                        key={seat.id}
-                                        onClick={() => handleSeatClick(seat.id, seat.number, seat.status)}
-                                        className={cn(
-                                        "p-1.5 border rounded cursor-pointer text-xs h-8 flex items-center justify-center",
-                                        seat.status === 'available' && (seat.originalColor || 'bg-green-200 hover:bg-green-300'),
-                                        seat.status === 'booked' && 'bg-gray-400 text-gray-600 cursor-not-allowed',
-                                        seat.status === 'selected' && 'bg-blue-600 text-white',
-                                        seat.status === 'unavailable' && 'bg-red-300 text-red-700 cursor-not-allowed'
-                                        )}
-                                    >
-                                        {seat.number?.substring(1)}
                                     </div>
-                                ))}
-                                <div /> 
-                                {row.slice(3).map(seat => (
-                                    <div
-                                        key={seat.id}
-                                        onClick={() => handleSeatClick(seat.id, seat.number, seat.status)}
-                                        className={cn(
-                                        "p-1.5 border rounded cursor-pointer text-xs h-8 flex items-center justify-center",
-                                        seat.status === 'available' && (seat.originalColor || 'bg-green-200 hover:bg-green-300'),
-                                        seat.status === 'booked' && 'bg-gray-400 text-gray-600 cursor-not-allowed',
-                                        seat.status === 'selected' && 'bg-blue-600 text-white',
-                                        seat.status === 'unavailable' && 'bg-red-300 text-red-700 cursor-not-allowed'
-                                        )}
-                                    >
-                                        {seat.number?.substring(1)}
-                                    </div>
-                                ))}
+                                </div>
+                                <div className="md:col-span-2">
+                                    {coachLayout.length > 0 ? (
+                                        <div className="overflow-x-auto p-4 border rounded-lg bg-muted/20">
+                                            <h3 className="text-md font-semibold mb-3 text-center">{selectedClass} Coach Layout</h3>
+                                            <div className="flex flex-col items-center space-y-1">
+                                                {coachLayout.map((row, rowIndex) => (
+                                                    <div key={`row-${rowIndex}`} className="flex flex-row space-x-1">
+                                                        {row.map((seat) => (
+                                                            <button key={seat.id} onClick={() => handleSeatClick(seat)} disabled={!['available', 'selected'].includes(seat.status)}
+                                                                className={cn("w-10 h-8 border rounded text-xs flex items-center justify-center font-medium transition-all",
+                                                                    seat.status === 'selected' ? 'bg-blue-600 text-white border-blue-700' :
+                                                                    seat.status === 'booked' ? 'bg-gray-400 text-gray-600 border-gray-500 cursor-not-allowed' :
+                                                                    seat.status === 'available' ? `${berthColors[seat.type]} hover:ring-2 hover:ring-primary` : 'bg-transparent border-transparent',
+                                                                    seat.type === 'aisle' && 'w-6'
+                                                                )}
+                                                                title={seat.number ? `Seat ${seat.number}` : ''}>
+                                                                {seat.type !== 'aisle' ? seat.number : ''}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : <Alert><AlertDescription>No visual layout for this class or date. Please select another option.</AlertDescription></Alert>}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
+                
+                {userSelectedSeats.length > 0 && (
+                    <Card className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[90%] max-w-lg shadow-2xl z-50 bg-background/95 backdrop-blur-sm">
+                        <CardContent className="p-4 flex items-center justify-between">
+                            <div>
+                                <p className="text-sm font-semibold">{userSelectedSeats.length} Seat{userSelectedSeats.length > 1 ? 's' : ''} Selected</p>
+                                <p className="text-xs text-muted-foreground truncate">{userSelectedSeats.join(', ')}</p>
                             </div>
-                            ))}
-                        </div>
-                         {userSelectedSeats.length > 0 && (
-                          <div className="mt-4 text-center">
-                            <p className="text-sm">Selected Seats: {userSelectedSeats.join(', ')}</p>
-                            <Button asChild className="mt-2">
-                              <Link href={`/bookings/passenger-details?trainId=${trainId}&date=${currentSelectedDateForURL}&class=${selectedClass}&origin=${encodeURIComponent(breadcrumbOrigin)}&destination=${encodeURIComponent(breadcrumbDestination)}&selectedSeats=${userSelectedSeats.join(',')}`}>
-                                Proceed to Enter Passenger Details ({userSelectedSeats.length})
-                              </Link>
+                            <Button asChild>
+                                <Link href={`/bookings/passenger-details?trainId=${trainId}&date=${currentSelectedDateForURL}&class=${selectedClass}&origin=${encodeURIComponent(breadcrumbOrigin)}&destination=${encodeURIComponent(breadcrumbDestination)}&selectedSeats=${userSelectedSeats.join(',')}`}>
+                                    Proceed <ChevronRight className="ml-1 h-4 w-4" />
+                                </Link>
                             </Button>
-                          </div>
-                        )}
-                    </div>
-                ) : (
-                  <Alert className="mt-6">
-                    <XCircle className="h-4 w-4"/>
-                    <AlertDescription>
-                      { (selectedClass === "1A" || selectedClass === "3A" || selectedClass === "2A" || selectedClass === "SL") ? `Generating ${selectedClass} layout...` : "No specific seat layout for this class in the demo, or data is still loading. Please select a valid date."}
-                    </AlertDescription>
-                  </Alert>
+                        </CardContent>
+                    </Card>
                 )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
-        {!displayableClasses.includes(selectedClass) && trainDetails.availableClasses.length > 0 && (
-             <TabsContent value={selectedClass} forceMount className="mt-4">
-                <Alert>
-                    <AlertDescription>
-                        The class '{selectedClass}' is not standard or not typically visualized with a detailed seat map in this demo.
-                        Please select one of the standard classes above if available: {standardClasses.join(', ')}.
-                    </AlertDescription>
-                </Alert>
-            </TabsContent>
-        )}
-        </Tabs>
-      </section>
-    </div>
-  );
+            </div>
+        </div>
+    );
 }
-

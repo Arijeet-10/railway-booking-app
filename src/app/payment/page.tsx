@@ -1,301 +1,272 @@
-
 "use client";
 
 import ClientAuthGuard from '@/components/ClientAuthGuard';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Ticket, Users, Train, CreditCard, ShieldCheck, Home, ArrowLeft, Loader2 } from 'lucide-react';
-import { useEffect, useState, Suspense } from 'react'; // Added Suspense
-import type { PassengerFormValues, Booking, GstDetails, TrainDetailed as TrainDetailsType } from '@/lib/types'; 
+import { Ticket, Users, Train, CreditCard, ShieldCheck, Home, ArrowLeft, Loader2, Landmark, Wallet, CircleUserRound } from 'lucide-react';
+import { useEffect, useState, Suspense, useMemo } from 'react';
+import type { PassengerFormValues, Booking, GstDetails, TrainDetailed as TrainDetailsType } from '@/lib/types';
 import { MOCK_TRAINS } from '@/lib/mock-data';
 import { auth, firestore } from '@/lib/firebase/config';
 import { collection, addDoc } from "firebase/firestore";
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { Separator } from '@/components/ui/separator';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { cn } from '@/lib/utils';
+
+// --- NEW UI COMPONENTS ---
+
+const BookingStepper = () => (
+    <div className="flex items-center justify-center space-x-2 sm:space-x-4 mb-8">
+        <div className="flex items-center text-sm text-muted-foreground">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground mr-2">1</span>
+            Seat Selection
+        </div>
+        <div className="flex-1 border-t-2 border-dashed border-border"></div>
+        <div className="flex items-center text-sm text-muted-foreground">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-muted-foreground mr-2">2</span>
+            Passenger Details
+        </div>
+        <div className="flex-1 border-t-2 border-dashed border-border"></div>
+        <div className="flex items-center text-sm font-semibold text-primary">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground mr-2">3</span>
+            Payment
+        </div>
+    </div>
+);
+
+const PaymentMethodSelector = ({ selected, onSelect }: { selected: string, onSelect: (method: string) => void }) => {
+    const methods = [
+        { id: 'upi', name: 'UPI', icon: Wallet },
+        { id: 'card', name: 'Credit/Debit Card', icon: CreditCard },
+        { id: 'netbanking', name: 'Net Banking', icon: Landmark },
+    ];
+    return (
+        <div className="grid grid-cols-3 gap-3">
+            {methods.map(method => (
+                <button
+                    key={method.id}
+                    onClick={() => onSelect(method.id)}
+                    className={cn(
+                        "p-4 border rounded-lg flex flex-col items-center justify-center space-y-2 transition-all duration-200",
+                        selected === method.id ? "border-primary bg-primary/5 text-primary shadow-md" : "hover:border-primary/50 hover:bg-muted/50"
+                    )}
+                >
+                    <method.icon className="h-6 w-6" />
+                    <span className="text-xs font-medium text-center">{method.name}</span>
+                </button>
+            ))}
+        </div>
+    );
+};
+
+// --- MAIN COMPONENT ---
 
 function PaymentPageContent() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const { toast } = useToast();
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const { toast } = useToast();
 
-  const trainId = searchParams.get('trainId');
-  const date = searchParams.get('date'); 
-  const selectedClassQuery = searchParams.get('class');
-  const origin = searchParams.get('origin');
-  const destination = searchParams.get('destination');
-  const numPassengersQuery = searchParams.get('numPassengers');
-  const selectedSeatsQuery = searchParams.get('selectedSeats');
+    const { trainId, date, selectedClassQuery, origin, destination, selectedSeatsQuery } = useMemo(() => ({
+        trainId: searchParams.get('trainId'),
+        date: searchParams.get('date'),
+        selectedClassQuery: searchParams.get('class'),
+        origin: searchParams.get('origin'),
+        destination: searchParams.get('destination'),
+        selectedSeatsQuery: searchParams.get('selectedSeats'),
+    }), [searchParams]);
 
+    const [passengers, setPassengers] = useState<PassengerFormValues[]>([]);
+    const [trainDetails, setTrainDetails] = useState<TrainDetailsType | null>(null);
+    const [fareDetails, setFareDetails] = useState({ ticketFare: 0, convenienceFee: 0, totalPrice: 0 });
+    const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('card');
 
-  const [passengers, setPassengers] = useState<PassengerFormValues[]>([]);
-  const [trainDetails, setTrainDetails] = useState<TrainDetailsType | null>(null);
-  const [ticketFare, setTicketFare] = useState(0);
-  const [convenienceFee, setConvenienceFee] = useState(0);
-  const [totalPrice, setTotalPrice] = useState(0);
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
-  const [actualSelectedSeats, setActualSelectedSeats] = useState<string[]>([]);
+    useEffect(() => {
+        const storedPassengers = localStorage.getItem('pendingBookingPassengers');
+        const seatsFromQuery = selectedSeatsQuery ? selectedSeatsQuery.split(',') : [];
 
-  useEffect(() => {
-    const storedPassengers = localStorage.getItem('pendingBookingPassengers');
-    const seatsFromQuery = selectedSeatsQuery ? selectedSeatsQuery.split(',') : [];
-    setActualSelectedSeats(seatsFromQuery);
+        if (storedPassengers) {
+            const parsedPassengers: PassengerFormValues[] = JSON.parse(storedPassengers);
+            const passengersWithSeats = parsedPassengers.slice(0, seatsFromQuery.length).map((p, index) => ({
+                ...p,
+                seatNumber: seatsFromQuery[index],
+                bookingStatus: (p.age ?? 0) > 18 ? 'CNF' : 'WL',
+                currentStatus: (p.age ?? 0) > 18 ? `CNF/${seatsFromQuery[index]}` : `WL/${index + 5}`,
+            }));
+            setPassengers(passengersWithSeats);
+        }
 
-    if (storedPassengers) {
-      let parsedPassengers: PassengerFormValues[] = JSON.parse(storedPassengers);
-      // Ensure passengers list length matches selected seats count
-      if (parsedPassengers.length !== seatsFromQuery.length) {
-          // If mismatch, take the minimum of the two or decide on a strategy
-          // For now, let's assume we only process passengers up to the number of selected seats
-          parsedPassengers = parsedPassengers.slice(0, seatsFromQuery.length);
-      }
-      
-      setPassengers(parsedPassengers.map((p, index) => ({
-        ...p,
-        seatNumber: seatsFromQuery[index] || `S${index + 1}`, // Assign seat number
-        bookingStatus: p.age && p.age > 18 ? 'CNF' : 'WL', 
-        currentStatus: p.age && p.age > 18 ? `CNF/${seatsFromQuery[index] || `S${index+1}`}/BERTH` : `WL/${index+5}`,
-      })));
-    } else if (seatsFromQuery.length > 0) {
-        // If no passengers in local storage but seats are in query, create placeholder passengers
-        // This case should ideally be handled by ensuring passenger details are always captured first
-        const placeholderPassengers = seatsFromQuery.map((seat, index) => ({
-            name: `Passenger ${index + 1}`,
-            age: 30, // Default age
-            gender: 'male' as 'male' | 'female' | 'other', // Default gender
-            preferredBerth: 'no_preference' as 'lower' | 'middle' | 'upper' | 'side_lower' | 'side_upper' | 'no_preference',
-            seatNumber: seat,
-            bookingStatus: 'CNF',
-            currentStatus: `CNF/${seat}/BERTH`,
-        }));
-        setPassengers(placeholderPassengers);
-    }
+        if (trainId && seatsFromQuery.length > 0) {
+            const foundTrain = MOCK_TRAINS.find(t => t.id === trainId);
+            if (foundTrain) {
+                setTrainDetails(foundTrain);
+                const pricePerPassenger = foundTrain.price;
+                const numPassengers = seatsFromQuery.length;
+                const ticketFare = pricePerPassenger * numPassengers;
+                const convenienceFee = 20 + (11.80 * numPassengers);
+                setFareDetails({ ticketFare, convenienceFee, totalPrice: ticketFare + convenienceFee });
+            }
+        }
+    }, [trainId, selectedSeatsQuery]);
 
+    const handleConfirmPayment = async () => {
+        setIsProcessingPayment(true);
+        const currentUser = auth.currentUser;
 
-    if (trainId && (numPassengersQuery || seatsFromQuery.length > 0)) {
-      const foundTrain = MOCK_TRAINS.find(t => t.id === trainId);
-      if (foundTrain) {
-        setTrainDetails(foundTrain);
-        const pricePerPassenger = foundTrain.price; 
-        const numActualPassengers = seatsFromQuery.length > 0 ? seatsFromQuery.length : parseInt(numPassengersQuery || "0", 10);
-        
-        const calculatedTicketFare = pricePerPassenger * numActualPassengers;
-        // More realistic convenience fee: fixed + per passenger
-        const baseConvenienceFee = 20; // Rs. 20 base
-        const perPassengerConvenienceFee = 11.80; // Rs. 11.80 per passenger (incl GST)
-        const calculatedConvenienceFee = baseConvenienceFee + (perPassengerConvenienceFee * numActualPassengers);
+        if (!currentUser || !trainDetails || !date || !selectedClassQuery || passengers.length === 0) {
+            toast({ title: "Error", description: "Missing booking information. Cannot proceed.", variant: "destructive" });
+            setIsProcessingPayment(false);
+            return;
+        }
 
-        setTicketFare(calculatedTicketFare);
-        setConvenienceFee(calculatedConvenienceFee);
-        setTotalPrice(calculatedTicketFare + calculatedConvenienceFee);
+        const bookingData: Booking = {
+            id: '', userId: currentUser.uid, trainId: trainDetails.id, trainName: trainDetails.trainName, trainNumber: trainDetails.trainNumber,
+            origin: origin!, destination: destination!, travelDate: date, departureTime: trainDetails.departureTime, arrivalTime: trainDetails.arrivalTime,
+            passengersList: passengers, seats: passengers.map(p => p.seatNumber!), numPassengers: passengers.length,
+            totalPrice: fareDetails.totalPrice, ticketFare: fareDetails.ticketFare, convenienceFee: fareDetails.convenienceFee,
+            status: 'upcoming', bookingDate: new Date().toISOString(), selectedClass: selectedClassQuery.toUpperCase(),
+            pnr: Math.random().toString().slice(2, 12).toUpperCase(), quota: "GENERAL (GN)",
+            distance: `${Math.floor(Math.random() * 500) + 200} KM`, transactionId: `TRN${Date.now()}`,
+            gstDetails: { /* Mock GST details */ }
+        };
 
-      }
-    }
-  }, [trainId, numPassengersQuery, selectedSeatsQuery, date]); // Added date to dependencies if it can influence pricing or train details
+        try {
+            const docRef = await addDoc(collection(firestore, "bookings"), bookingData);
+            toast({ title: "Payment Successful!", description: `Booking confirmed! PNR: ${bookingData.pnr}` });
+            localStorage.removeItem('pendingBookingPassengers');
+            router.push(`/bookings/${docRef.id}`);
+        } catch (error) {
+            toast({ title: "Booking Failed", description: "Could not save your booking. Please contact support.", variant: "destructive" });
+        } finally {
+            setIsProcessingPayment(false);
+        }
+    };
 
-
-  const handleConfirmPayment = async () => {
-    setIsProcessingPayment(true);
-    const currentUser = auth.currentUser;
-
-    if (!currentUser || !trainDetails || !trainId || !date || !selectedClassQuery || !origin || !destination || passengers.length === 0 || actualSelectedSeats.length === 0) {
-      toast({
-        title: "Error",
-        description: "Missing booking information, user not logged in, or no seats selected. Cannot proceed.",
-        variant: "destructive",
-      });
-      setIsProcessingPayment(false);
-      return;
+    if (!trainDetails || passengers.length === 0) {
+        return (
+            <div className="max-w-md mx-auto py-12">
+                <Alert variant="destructive">
+                    <Ticket className="h-4 w-4" />
+                    <AlertTitle>Error: Incomplete Information</AlertTitle>
+                    <AlertDescription>
+                        Booking details are missing or have expired. Please start the booking process again.
+                        <Button variant="link" asChild className="mt-2"><Link href="/">Go Home</Link></Button>
+                    </AlertDescription>
+                </Alert>
+            </div>
+        );
     }
     
-    const mockGstDetails: GstDetails = {
-      invoiceNumber: `PS${Date.now().toString().slice(-10)}`,
-      supplierSacCode: "996421", // Railway transport services
-      supplierGstin: "07AAAGM0289C1ZL", // Example GSTIN for Indian Railways (illustrative)
-      supplierAddress: "Indian Railways, Rail Bhavan, New Delhi - 110001", 
-      recipientGstin: "NA", // Assuming B2C transaction
-      recipientName: currentUser.displayName || passengers[0]?.name || "Valued Customer",
-      recipientAddress: "NA", 
-      taxableValue: ticketFare, 
-      cgstRate: "2.5%",
-      cgstAmount: parseFloat((ticketFare * 0.025).toFixed(2)),
-      sgstUtgstRate: "2.5%", 
-      sgstUtgstAmount: parseFloat((ticketFare * 0.025).toFixed(2)),
-      igstRate: "0.0%", 
-      igstAmount: 0,
-    };
-
-
-    const bookingData: Booking = {
-      id: '', // Will be set by Firestore
-      userId: currentUser.uid,
-      trainId: trainId,
-      trainName: trainDetails.trainName,
-      trainNumber: trainDetails.trainNumber,
-      origin: origin,
-      destination: destination,
-      travelDate: date, 
-      departureTime: trainDetails.departureTime,
-      arrivalTime: trainDetails.arrivalTime,
-      passengersList: passengers, 
-      seats: actualSelectedSeats, 
-      numPassengers: actualSelectedSeats.length,
-      totalPrice: totalPrice,
-      ticketFare: ticketFare, 
-      convenienceFee: convenienceFee, 
-      status: 'upcoming',
-      bookingDate: new Date().toISOString(),
-      selectedClass: selectedClassQuery.toUpperCase(), 
-
-      pnr: Math.random().toString().slice(2, 12).toUpperCase(), 
-      quota: "GENERAL (GN)", 
-      distance: `${Math.floor(Math.random() * 500) + 200} KM`, 
-      transactionId: `TRN${Date.now()}`, 
-      gstDetails: mockGstDetails,
-    };
-
-    try {
-      const docRef = await addDoc(collection(firestore, "bookings"), bookingData);
-      toast({
-        title: "Payment Successful!",
-        description: `Your booking (ID: ${docRef.id}) is confirmed. PNR: ${bookingData.pnr}`,
-      });
-      localStorage.removeItem('pendingBookingPassengers');
-      router.push('/bookings');
-    } catch (error) {
-      console.error("Error saving booking: ", error);
-      toast({
-        title: "Booking Save Failed",
-        description: "Could not save your booking details. Please contact support.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsProcessingPayment(false);
-    }
-  };
-
-  if (!trainId || !date || !selectedClassQuery || (!numPassengersQuery && actualSelectedSeats.length === 0)) {
     return (
-      <div className="max-w-md mx-auto py-12">
-          <Alert variant="destructive">
-              <Ticket className="h-4 w-4" />
-              <AlertTitle>Error: Incomplete Information</AlertTitle>
-              <AlertDescription>
-                  Booking details are missing. Please start the booking process again.
-                  <Button variant="link" asChild className="mt-2">
-                      <Link href="/">Go to Home</Link>
-                  </Button>
-              </AlertDescription>
-          </Alert>
-      </div>
-    )
-  }
-  const numPassengersDisplay = actualSelectedSeats.length > 0 ? actualSelectedSeats.length : parseInt(numPassengersQuery || "0", 10);
+        <div className="container mx-auto px-4 py-8">
+            <BookingStepper />
+            <h1 className="text-3xl font-bold font-headline mb-2 text-center">Final Step: Secure Payment</h1>
+            <p className="text-center text-muted-foreground mb-8">Review your trip and complete the payment to confirm your booking.</p>
+            
+            <div className="lg:grid lg:grid-cols-3 lg:gap-8 lg:items-start">
+                {/* --- Right Column (Sticky Summary) --- */}
+                <div className="lg:col-span-1 lg:order-last mb-8 lg:mb-0">
+                    <Card className="shadow-lg lg:sticky lg:top-24 border-primary/20 bg-white/80 backdrop-blur-sm">
+                        <CardHeader>
+                            <CardTitle>Fare Summary</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3 text-sm">
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Ticket Fare</span>
+                                <span>₹{fareDetails.ticketFare.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Conv. Fee + GST</span>
+                                <span>₹{fareDetails.convenienceFee.toFixed(2)}</span>
+                            </div>
+                            <Separator />
+                            <div className="flex justify-between font-bold text-lg">
+                                <span>Total Amount</span>
+                                <span className="text-primary">₹{fareDetails.totalPrice.toFixed(2)}</span>
+                            </div>
+                        </CardContent>
+                        <div className="p-4 pt-0">
+                            <Button size="lg" onClick={handleConfirmPayment} className="w-full bg-green-600 hover:bg-green-700 text-white" disabled={isProcessingPayment}>
+                                {isProcessingPayment ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <ShieldCheck className="mr-2 h-5 w-5" />}
+                                {isProcessingPayment ? 'Processing...' : `Pay ₹${fareDetails.totalPrice.toFixed(2)}`}
+                            </Button>
+                        </div>
+                    </Card>
+                </div>
+                
+                {/* --- Left Column (Main Content) --- */}
+                <div className="lg:col-span-2 space-y-8">
+                    <Card className="shadow-md">
+                        <CardHeader>
+                            <CardTitle>Trip Details</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex items-start justify-between p-4 rounded-lg bg-muted/50">
+                                <div className="font-medium">
+                                    <p>{trainDetails.trainName} ({trainDetails.trainNumber})</p>
+                                    <p className="text-sm text-muted-foreground">{origin} → {destination}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="font-medium">{format(new Date(date + "T00:00:00"), 'EEE, dd MMM yyyy')}</p>
+                                    <p className="text-sm text-muted-foreground">Class: {selectedClassQuery?.toUpperCase()}</p>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 className="text-md font-semibold mb-2 flex items-center"><Users className="mr-2 h-5 w-5" />Passengers ({passengers.length})</h3>
+                                <div className="space-y-2">
+                                    {passengers.map((p, i) => (
+                                        <div key={i} className="flex items-center space-x-3 text-sm">
+                                            <Avatar className="h-8 w-8 text-xs"><AvatarFallback>{p.name.charAt(0)}</AvatarFallback></Avatar>
+                                            <span className="font-medium flex-1">{p.name}</span>
+                                            <span className="text-muted-foreground">Seat: {p.seatNumber}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
 
-
-  return (
-    <div className="max-w-2xl mx-auto py-8 space-y-6">
-        <Button variant="outline" size="sm" onClick={() => router.back()} className="mb-4" disabled={isProcessingPayment}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back
-      </Button>
-
-      <Card className="shadow-xl">
-        <CardHeader>
-          <CardTitle className="text-3xl font-headline flex items-center">
-              <CreditCard className="mr-3 h-8 w-8 text-primary" />
-              Confirm Your Payment
-          </CardTitle>
-          <CardDescription>Review your booking details and complete the payment.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {trainDetails && (
-              <Alert className="border-primary/30 bg-primary/5">
-                  <Train className="h-5 w-5 text-primary" />
-                  <AlertTitle className="text-primary font-semibold">Booking Summary</AlertTitle>
-                  <AlertDescription className="mt-2 space-y-1 text-sm">
-                      <p><strong>Train:</strong> {trainDetails.trainName} ({trainDetails.trainNumber})</p>
-                      <p><strong>Route:</strong> {origin} to {destination}</p>
-                      <p><strong>Date:</strong> {format(new Date(date + "T00:00:00"), 'PPP')}</p>
-                      <p><strong>Class:</strong> <span className="font-semibold">{selectedClassQuery.toUpperCase()}</span></p>
-                      <p><strong>Passengers:</strong> {numPassengersDisplay}</p>
-                      {actualSelectedSeats.length > 0 && <p><strong>Seats:</strong> {actualSelectedSeats.join(', ')}</p>}
-                  </AlertDescription>
-              </Alert>
-          )}
-
-          {passengers.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold mb-2 mt-4 flex items-center">
-                  <Users className="mr-2 h-5 w-5 text-muted-foreground" /> Passengers ({passengers.length})
-              </h3>
-              <ul className="list-disc list-inside pl-4 space-y-1 text-sm text-muted-foreground max-h-32 overflow-y-auto">
-                {passengers.map((p, i) => (
-                  <li key={i}>
-                    {p.name} (Age: {p.age}, Gender: {p.gender.charAt(0).toUpperCase() + p.gender.slice(1)})
-                    {p.seatNumber && <span className="ml-2 text-xs">(Seat: {p.seatNumber})</span>}
-                  </li>
-                ))}
-              </ul>
+                    <Card className="shadow-md">
+                        <CardHeader>
+                            <CardTitle>Choose Payment Method</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <PaymentMethodSelector selected={selectedPaymentMethod} onSelect={setSelectedPaymentMethod} />
+                            <Alert className="mt-6 border-green-500/50 bg-green-500/5">
+                                <ShieldCheck className="h-5 w-5 text-green-600"/>
+                                <AlertTitle className="text-green-700">100% Secure & Simulated</AlertTitle>
+                                <AlertDescription>This is a demo. Clicking 'Pay' will confirm your booking without any real transaction.</AlertDescription>
+                            </Alert>
+                        </CardContent>
+                    </Card>
+                    <div className="flex justify-start">
+                        <Button variant="outline" onClick={() => router.back()} disabled={isProcessingPayment}>
+                            <ArrowLeft className="mr-2 h-4 w-4" /> Go Back
+                        </Button>
+                    </div>
+                </div>
             </div>
-          )}
-          
-          <div className="border-t pt-4 mt-4 space-y-2">
-              <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Ticket Fare ({numPassengersDisplay}x):</span>
-                  <span>₹{ticketFare.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">IRCTC Convenience Fee (Incl. GST):</span>
-                  <span>₹{convenienceFee.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between text-lg font-bold mt-2">
-                  <span>Total Amount:</span>
-                  <span className="text-green-600">₹{totalPrice.toFixed(2)}</span>
-              </div>
-          </div>
-
-          <Alert className="mt-6 border-green-500/50 bg-green-500/5">
-              <ShieldCheck className="h-5 w-5 text-green-600"/>
-              <AlertTitle className="text-green-700">Secure Payment</AlertTitle>
-              <AlertDescription>
-                  This is a simulated payment gateway. Clicking "Confirm & Pay" will save your booking to the database. No real transaction will occur.
-              </AlertDescription>
-          </Alert>
-
-        </CardContent>
-        <CardFooter className="flex flex-col sm:flex-row justify-between items-center gap-3">
-          <Button variant="outline" onClick={() => router.push('/')} className="w-full sm:w-auto" disabled={isProcessingPayment}>
-              <Home className="mr-2 h-4 w-4" /> Cancel & Go Home
-          </Button>
-          <Button 
-              size="lg" 
-              onClick={handleConfirmPayment} 
-              className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
-              disabled={isProcessingPayment || passengers.length === 0 || !trainDetails || actualSelectedSeats.length === 0}
-          >
-            {isProcessingPayment ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
-            {isProcessingPayment ? 'Processing...' : `Confirm & Pay ₹${totalPrice.toFixed(2)}`}
-          </Button>
-        </CardFooter>
-      </Card>
-    </div>
-  );
+        </div>
+    );
 }
 
-
 export default function PaymentPage() {
-  return (
-    <ClientAuthGuard>
-      <Suspense fallback={
-        <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
-          <Loader2 className="h-16 w-16 animate-spin text-primary" />
-          <p className="ml-4 text-muted-foreground">Loading payment details...</p>
+    return (
+        <div className="bg-gradient-to-b from-slate-50 to-white min-h-screen">
+            <ClientAuthGuard>
+                <Suspense fallback={
+                    <div className="flex justify-center items-center min-h-[calc(100vh-200px)]">
+                        <Loader2 className="h-16 w-16 animate-spin text-primary" />
+                    </div>
+                }>
+                    <PaymentPageContent />
+                </Suspense>
+            </ClientAuthGuard>
         </div>
-      }>
-        <PaymentPageContent />
-      </Suspense>
-    </ClientAuthGuard>
-  );
+    );
 }
